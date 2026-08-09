@@ -22,7 +22,7 @@ fi
 : "${KIOSK_REPO_URL:=}"
 : "${RPI_OS_IMAGE_URL:=}"
 
-for command in curl losetup mount umount xz; do
+for command in curl losetup mcopy mount openssl umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
 done
 
@@ -48,7 +48,19 @@ BASE_IMAGE="$WORK_DIR/os.img"
 OUTPUT_IMAGE="$DIST_DIR/rahamin-tv-kiosk-rpi3.img"
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
 
+read -r BOOT_START BOOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 1 "$OUTPUT_IMAGE")
 read -r ROOT_START ROOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 2 "$OUTPUT_IMAGE")
+
+# Raspberry Pi OS otherwise stops at its first-run username prompt. Provision a
+# dedicated account through the same boot-file mechanism used by Pi Imager. The
+# random password is intentionally discarded; LightDM logs this account in
+# automatically after the kiosk packages are installed.
+KIOSK_PASSWORD=$(openssl rand -hex 32)
+KIOSK_PASSWORD_HASH=$(printf '%s' "$KIOSK_PASSWORD" | openssl passwd -6 -stdin)
+printf 'kiosk:%s\n' "$KIOSK_PASSWORD_HASH" > "$WORK_DIR/userconf.txt"
+mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/userconf.txt" ::userconf
+mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/userconf.txt" ::userconf.txt
+
 ROOT_LOOP=$(losetup --find --show --offset "$((ROOT_START * 512))" --sizelimit "$((ROOT_SECTORS * 512))" "$OUTPUT_IMAGE")
 mount "$ROOT_LOOP" "$WORK_DIR/root"
 
