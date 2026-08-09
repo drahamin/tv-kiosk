@@ -32,12 +32,14 @@ fi
 
 WORK_DIR=$(mktemp -d)
 DIST_DIR="$ROOT_DIR/dist"
-LOOP_DEVICE=""
+BOOT_LOOP=""
+ROOT_LOOP=""
 cleanup() {
   set +e
   mountpoint -q "$WORK_DIR/root" && umount "$WORK_DIR/root"
   mountpoint -q "$WORK_DIR/boot" && umount "$WORK_DIR/boot"
-  [[ -n "$LOOP_DEVICE" ]] && losetup -d "$LOOP_DEVICE"
+  [[ -n "$ROOT_LOOP" ]] && losetup -d "$ROOT_LOOP"
+  [[ -n "$BOOT_LOOP" ]] && losetup -d "$BOOT_LOOP"
   rm -rf "$WORK_DIR"
 }
 trap cleanup EXIT
@@ -49,9 +51,12 @@ BASE_IMAGE="$WORK_DIR/os.img"
 OUTPUT_IMAGE="$DIST_DIR/rahamin-tv-kiosk-rpi3.img"
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
 
-LOOP_DEVICE=$(losetup --find --show --partscan "$OUTPUT_IMAGE")
-mount "${LOOP_DEVICE}p2" "$WORK_DIR/root"
-mount "${LOOP_DEVICE}p1" "$WORK_DIR/boot"
+read -r BOOT_START BOOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 1 "$OUTPUT_IMAGE")
+read -r ROOT_START ROOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 2 "$OUTPUT_IMAGE")
+BOOT_LOOP=$(losetup --find --show --offset "$((BOOT_START * 512))" --sizelimit "$((BOOT_SECTORS * 512))" "$OUTPUT_IMAGE")
+ROOT_LOOP=$(losetup --find --show --offset "$((ROOT_START * 512))" --sizelimit "$((ROOT_SECTORS * 512))" "$OUTPUT_IMAGE")
+mount "$ROOT_LOOP" "$WORK_DIR/root"
+mount "$BOOT_LOOP" "$WORK_DIR/boot"
 
 mkdir -p "$WORK_DIR/root/opt/tv-kiosk-bootstrap" "$WORK_DIR/root/etc/NetworkManager/system-connections" "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants"
 for item in app config scripts session systemd install.sh README.md; do
@@ -124,8 +129,10 @@ printf 'country=%s\n' "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/wpa_supplicant/wpa_s
 sync
 umount "$WORK_DIR/root"
 umount "$WORK_DIR/boot"
-losetup -d "$LOOP_DEVICE"
-LOOP_DEVICE=""
+losetup -d "$ROOT_LOOP"
+losetup -d "$BOOT_LOOP"
+ROOT_LOOP=""
+BOOT_LOOP=""
 
 xz -T0 -f -k "$OUTPUT_IMAGE"
 echo "Created $OUTPUT_IMAGE and $OUTPUT_IMAGE.xz"
