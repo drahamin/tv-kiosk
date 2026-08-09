@@ -54,6 +54,7 @@ if [ -n "$KIOSK_REPO_URL" ]; then
   progress 3 'Installing GitHub download support'
   apt-get update >> "$LOG_FILE" 2>&1
   DEBIAN_FRONTEND=noninteractive apt-get install -y git >> "$LOG_FILE" 2>&1
+  export KIOSK_APT_UPDATED=1
 
   progress 4 'Downloading the latest kiosk from GitHub'
   rm -rf /opt/tv-kiosk
@@ -67,7 +68,7 @@ else
 fi
 
 progress 5 'Installing the browser and full-screen display'
-printf 'This is the longest step and can take 10 to 20 minutes.\n'
+printf 'The display software is being checked and configured.\n'
 "$INSTALLER" >> "$LOG_FILE" 2>&1
 
 progress 6 'Setup complete — starting the TV kiosk'
