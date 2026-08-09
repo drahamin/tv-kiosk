@@ -64,7 +64,7 @@ mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/userconf.txt" ::us
 ROOT_LOOP=$(losetup --find --show --offset "$((ROOT_START * 512))" --sizelimit "$((ROOT_SECTORS * 512))" "$OUTPUT_IMAGE")
 mount "$ROOT_LOOP" "$WORK_DIR/root"
 
-mkdir -p "$WORK_DIR/root/opt/tv-kiosk-bootstrap" "$WORK_DIR/root/etc/NetworkManager/system-connections" "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants"
+mkdir -p "$WORK_DIR/root/opt/tv-kiosk-bootstrap" "$WORK_DIR/root/etc/NetworkManager/system-connections" "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants" "$WORK_DIR/root/etc/tv-kiosk"
 for item in app config scripts session systemd install.sh README.md; do
   cp -a "$ROOT_DIR/$item" "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
 done
@@ -93,40 +93,14 @@ method=auto
 EOF
 chmod 600 "$WORK_DIR/root/etc/NetworkManager/system-connections/Home.nmconnection"
 
-cat > "$WORK_DIR/root/usr/local/sbin/tv-kiosk-firstboot" <<EOF
-#!/bin/sh
-set -eu
-export KIOSK_PORT='$KIOSK_PORT'
-export KIOSK_UPDATE_BRANCH='$KIOSK_UPDATE_BRANCH'
-if [ -n '$KIOSK_REPO_URL' ]; then
-  apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y git
-  rm -rf /opt/tv-kiosk
-  git clone --branch '$KIOSK_UPDATE_BRANCH' --single-branch '$KIOSK_REPO_URL' /opt/tv-kiosk
-  /opt/tv-kiosk/install.sh
-else
-  /opt/tv-kiosk-bootstrap/install.sh
-fi
-systemctl disable tv-kiosk-firstboot.service
-reboot
-EOF
-chmod 755 "$WORK_DIR/root/usr/local/sbin/tv-kiosk-firstboot"
-
-cat > "$WORK_DIR/root/etc/systemd/system/tv-kiosk-firstboot.service" <<EOF
-[Unit]
-Description=Install Rahamin TV kiosk on first boot
-Wants=network-online.target
-After=network-online.target
-ConditionPathExists=/opt/tv-kiosk-bootstrap/install.sh
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/tv-kiosk-firstboot
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
+install -m 0755 "$ROOT_DIR/image/tv-kiosk-firstboot" "$WORK_DIR/root/usr/local/sbin/tv-kiosk-firstboot"
+install -m 0644 "$ROOT_DIR/image/tv-kiosk-firstboot.service" "$WORK_DIR/root/etc/systemd/system/tv-kiosk-firstboot.service"
+{
+  printf 'KIOSK_PORT=%q\n' "$KIOSK_PORT"
+  printf 'KIOSK_UPDATE_BRANCH=%q\n' "$KIOSK_UPDATE_BRANCH"
+  printf 'KIOSK_REPO_URL=%q\n' "$KIOSK_REPO_URL"
+} > "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
+chmod 600 "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/tv-kiosk-firstboot.service"
 
 printf 'REGDOMAIN=%s\n' "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/default/crda"
