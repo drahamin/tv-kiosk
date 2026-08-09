@@ -12,13 +12,24 @@ KIOSK_USER=${KIOSK_USER:-kiosk}
 KIOSK_PORT=${KIOSK_PORT:-8999}
 KIOSK_UPDATE_BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 
-apt-get update
+if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
+  apt-get update
+fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  chromium git lightdm network-manager openbox python3 unclutter x11-xserver-utils xserver-xorg
+  avahi-daemon chromium git lightdm network-manager openbox openssh-server python3 unclutter x11-xserver-utils xserver-xorg
 
 if ! id "$KIOSK_USER" >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash "$KIOSK_USER"
 fi
+
+groupadd --force autologin
+groupadd --force nopasswdlogin
+usermod --append --groups autologin,nopasswdlogin "$KIOSK_USER"
+for group in audio video render input plugdev netdev tty; do
+  if getent group "$group" >/dev/null 2>&1; then
+    usermod --append --groups "$group" "$KIOSK_USER"
+  fi
+done
 
 if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
   rm -rf "$APP_DIR"
@@ -39,6 +50,7 @@ cat > /etc/lightdm/lightdm.conf.d/50-tv-kiosk.conf <<EOF
 [Seat:*]
 autologin-user=$KIOSK_USER
 autologin-user-timeout=0
+autologin-session=openbox
 user-session=openbox
 xserver-command=X -s 0 -dpms
 EOF
@@ -52,7 +64,7 @@ install -m 0644 "$APP_DIR/systemd/tv-kiosk-update.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/systemd/tv-kiosk-update.timer" /etc/systemd/system/
 
 systemctl daemon-reload
-systemctl enable tv-kiosk-web.service tv-kiosk-update.timer lightdm.service
+systemctl enable avahi-daemon.service ssh.service tv-kiosk-web.service tv-kiosk-update.timer lightdm.service
 systemctl set-default graphical.target
 
 echo "TV kiosk installed. Reboot to start the full-screen display."
