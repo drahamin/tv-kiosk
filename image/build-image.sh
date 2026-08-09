@@ -27,6 +27,7 @@ if [[ "$SSH_PUBLIC_KEY_FILE" != /* ]]; then
   SSH_PUBLIC_KEY_FILE="$ROOT_DIR/$SSH_PUBLIC_KEY_FILE"
 fi
 [[ -s "$SSH_PUBLIC_KEY_FILE" ]] || { echo "Missing SSH public key: $SSH_PUBLIC_KEY_FILE" >&2; exit 1; }
+[[ "$WIFI_COUNTRY" =~ ^[A-Z]{2}$ ]] || { echo "WIFI_COUNTRY must be a two-letter uppercase country code" >&2; exit 1; }
 
 for command in curl losetup mcopy mount openssl umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
@@ -68,6 +69,10 @@ mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/userconf.txt" ::us
 mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/userconf.txt" ::userconf.txt
 touch "$WORK_DIR/ssh"
 mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/ssh" ::ssh
+mcopy -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" ::cmdline.txt "$WORK_DIR/cmdline.txt"
+sed -i -E 's/[[:space:]]+cfg80211\.ieee80211_regdom=[^[:space:]]+//g' "$WORK_DIR/cmdline.txt"
+sed -i "s/$/ cfg80211.ieee80211_regdom=$WIFI_COUNTRY/" "$WORK_DIR/cmdline.txt"
+mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/cmdline.txt" ::cmdline.txt
 
 ROOT_LOOP=$(losetup --find --show --offset "$((ROOT_START * 512))" --sizelimit "$((ROOT_SECTORS * 512))" "$OUTPUT_IMAGE")
 mount "$ROOT_LOOP" "$WORK_DIR/root"
@@ -108,6 +113,10 @@ else
   printf '127.0.1.1\ttv-kiosk\n' >> "$WORK_DIR/root/etc/hosts"
 fi
 
+cat > "$WORK_DIR/root/etc/modprobe.d/rfkill_default.conf" <<EOF
+options rfkill default_state=1
+EOF
+
 install -d -m 0700 -o 1000 -g 1000 "$WORK_DIR/root/home/kiosk/.ssh"
 install -m 0600 -o 1000 -g 1000 "$SSH_PUBLIC_KEY_FILE" "$WORK_DIR/root/home/kiosk/.ssh/authorized_keys"
 mkdir -p "$WORK_DIR/root/etc/ssh/sshd_config.d"
@@ -124,6 +133,7 @@ install -m 0644 "$ROOT_DIR/image/tv-kiosk-firstboot.service" "$WORK_DIR/root/etc
   printf 'KIOSK_PORT=%q\n' "$KIOSK_PORT"
   printf 'KIOSK_UPDATE_BRANCH=%q\n' "$KIOSK_UPDATE_BRANCH"
   printf 'KIOSK_REPO_URL=%q\n' "$KIOSK_REPO_URL"
+  printf 'WIFI_COUNTRY=%q\n' "$WIFI_COUNTRY"
 } > "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 chmod 600 "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/tv-kiosk-firstboot.service"
@@ -134,7 +144,6 @@ elif [[ -e "$WORK_DIR/root/usr/lib/systemd/system/ssh.service" ]]; then
   ln -sf /usr/lib/systemd/system/ssh.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/ssh.service"
 fi
 
-printf 'REGDOMAIN=%s\n' "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/default/crda"
 mkdir -p "$WORK_DIR/root/etc/wpa_supplicant"
 printf 'country=%s\n' "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/wpa_supplicant/wpa_supplicant.conf"
 sync
