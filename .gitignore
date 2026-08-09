@@ -1,0 +1,8 @@
+dist/
+image/config.local.env
+*.img
+*.img.xz
+*.zip
+.DS_Store
+__pycache__/
+*.pyc

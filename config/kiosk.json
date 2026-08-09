@@ -1,0 +1,17 @@
+{
+  "rotation_seconds": 25,
+  "pages": [
+    {
+      "name": "Rahamin ADS-B TV",
+      "url": "http://192.168.86.155:8998/tv?area=miami"
+    },
+    {
+      "name": "Rahamin AIS TV",
+      "url": "http://192.168.86.196:8999/tv?area=miami"
+    },
+    {
+      "name": "Airport Board",
+      "url": "http://192.168.86.196:8999/airport-tv"
+    }
+  ]
+}

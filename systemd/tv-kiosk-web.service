@@ -1,0 +1,19 @@
+[Unit]
+Description=Rahamin TV kiosk web service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/tv-kiosk/kiosk.env
+WorkingDirectory=/opt/tv-kiosk
+ExecStart=/usr/bin/python3 /opt/tv-kiosk/app/server.py
+Restart=always
+RestartSec=3
+User=kiosk
+Group=kiosk
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+[Unit]
+Description=Update Rahamin TV kiosk from GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/tv-kiosk/kiosk.env
+ExecStart=/opt/tv-kiosk/scripts/update-kiosk.sh
