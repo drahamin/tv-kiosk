@@ -12,6 +12,7 @@ fi
 : "${KIOSK_PORT:=8999}"
 : "${KIOSK_UPDATE_BRANCH:=main}"
 : "${KIOSK_REPO_URL:=}"
+: "${WIFI_COUNTRY:=US}"
 
 progress() {
   printf '\n\033[1;36m[%s/6]\033[0m \033[1m%s\033[0m\n' "$1" "$2"
@@ -44,11 +45,22 @@ progress 1 'Starting unattended kiosk setup'
 printf 'Boot services are ready.\n'
 
 progress 2 'Connecting to Wi-Fi and the internet'
+if command -v raspi-config >/dev/null 2>&1; then
+  raspi-config nonint do_wifi_country "$WIFI_COUNTRY" >> "$LOG_FILE" 2>&1 || true
+fi
+rfkill unblock wifi >> "$LOG_FILE" 2>&1 || true
+nmcli radio wifi on >> "$LOG_FILE" 2>&1 || true
+systemctl restart NetworkManager.service >> "$LOG_FILE" 2>&1 || true
 if ! nm-online --wait-for-startup --quiet --timeout=180 >> "$LOG_FILE" 2>&1; then
   printf 'Wi-Fi is not ready yet. A retry will start automatically.\n' >> "$LOG_FILE"
   exit 1
 fi
+NETWORK_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
 printf 'Network connected.\n'
+if [ -n "$NETWORK_ADDRESS" ]; then
+  printf 'Device address: %s\n' "$NETWORK_ADDRESS"
+  printf 'Remote maintenance: kiosk@%s\n' "$NETWORK_ADDRESS"
+fi
 
 if [ -n "$KIOSK_REPO_URL" ]; then
   progress 3 'Installing GitHub download support'
@@ -76,6 +88,9 @@ systemctl disable tv-kiosk-firstboot.service >> "$LOG_FILE" 2>&1
 sync
 printf '\nThe Raspberry Pi will reboot in 5 seconds.\n'
 printf 'After reboot, the three TV pages will start automatically.\n'
+if [ -n "${NETWORK_ADDRESS:-}" ]; then
+  printf 'Maintenance address: kiosk@%s\n' "$NETWORK_ADDRESS"
+fi
 trap - EXIT
 sleep 5
 reboot

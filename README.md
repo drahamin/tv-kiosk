@@ -49,6 +49,9 @@ Allow roughly 5–15 minutes before the display appears. No username entry is re
 image provisions a dedicated `kiosk` account and logs it in automatically. A
 full-screen progress display shows the current installation stage and reports
 automatic retries if Wi-Fi or package installation is temporarily unavailable.
+Once connected, it also shows the Pi's current IP address for remote support.
+The wireless country and rfkill state are applied before NetworkManager starts,
+so Wi-Fi comes online without a keyboard or configuration prompt.
 
 The image also enables key-only SSH maintenance as `kiosk@tv-kiosk.local` from
 the first boot. Password and root SSH logins are disabled. The public key is
