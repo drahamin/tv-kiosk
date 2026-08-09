@@ -22,18 +22,12 @@ fi
 : "${KIOSK_REPO_URL:=}"
 : "${RPI_OS_IMAGE_URL:=}"
 
-for command in curl unzip losetup mount umount; do
+for command in curl losetup mount umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
 done
 
 if [[ -z "$RPI_OS_IMAGE_URL" ]]; then
-  listing=$(curl -fsSL https://downloads.raspberrypi.com/raspios_lite_armhf/images/)
-  release=$(printf '%s' "$listing" | grep -oE 'raspios_lite_armhf-[0-9-]+/' | tail -1)
-  [[ -n "$release" ]] || { echo "Unable to find latest Raspberry Pi OS release" >&2; exit 1; }
-  release_page=$(curl -fsSL "https://downloads.raspberrypi.com/raspios_lite_armhf/images/$release")
-  archive=$(printf '%s' "$release_page" | grep -oE '[^\"]+\.zip' | grep -v torrent | tail -1)
-  [[ -n "$archive" ]] || { echo "Unable to find Raspberry Pi OS image archive" >&2; exit 1; }
-  RPI_OS_IMAGE_URL="https://downloads.raspberrypi.com/raspios_lite_armhf/images/$release$archive"
+  RPI_OS_IMAGE_URL=https://downloads.raspberrypi.com/raspios_lite_armhf_latest
 fi
 
 WORK_DIR=$(mktemp -d)
@@ -49,10 +43,9 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$DIST_DIR" "$WORK_DIR/root" "$WORK_DIR/boot"
-curl -fL "$RPI_OS_IMAGE_URL" -o "$WORK_DIR/os.zip"
-unzip -q "$WORK_DIR/os.zip" -d "$WORK_DIR"
-BASE_IMAGE=$(find "$WORK_DIR" -maxdepth 1 -name '*.img' -print -quit)
-[[ -n "$BASE_IMAGE" ]] || { echo "Downloaded archive did not contain an image" >&2; exit 1; }
+curl -fL "$RPI_OS_IMAGE_URL" -o "$WORK_DIR/os.img.xz"
+xz -dc "$WORK_DIR/os.img.xz" > "$WORK_DIR/os.img"
+BASE_IMAGE="$WORK_DIR/os.img"
 OUTPUT_IMAGE="$DIST_DIR/rahamin-tv-kiosk-rpi3.img"
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
 

@@ -3,7 +3,7 @@
   "pages": [
     {
       "name": "Rahamin ADS-B TV",
-      "url": "http://192.168.86.155:8998/tv?area=miami"
+      "url": "http://192.168.86.155:8998/tv"
     },
     {
       "name": "Rahamin AIS TV",
