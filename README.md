@@ -5,7 +5,7 @@ This repository builds and installs a full-screen Raspberry Pi kiosk for a
 
 1. Rahamin ADS-B TV
 2. Rahamin AIS TV (Miami)
-3. Rahamin airport board
+3. Airport / Samsung TV board
 
 The local kiosk listens on port `8999` by default and exposes:
 

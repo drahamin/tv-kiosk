@@ -10,8 +10,8 @@
       "url": "http://192.168.86.196:8999/tv?area=miami"
     },
     {
-      "name": "Airport Board",
-      "url": "http://192.168.86.196:8999/airport-tv"
+      "name": "Airport / Samsung TV Board",
+      "url": "http://192.168.86.155:8999/tv"
     }
   ]
 }
