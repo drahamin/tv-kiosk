@@ -61,7 +61,9 @@ mount "${LOOP_DEVICE}p2" "$WORK_DIR/root"
 mount "${LOOP_DEVICE}p1" "$WORK_DIR/boot"
 
 mkdir -p "$WORK_DIR/root/opt/tv-kiosk-bootstrap" "$WORK_DIR/root/etc/NetworkManager/system-connections" "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants"
-cp -a "$ROOT_DIR"/. "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
+for item in app config scripts session systemd install.sh README.md; do
+  cp -a "$ROOT_DIR/$item" "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
+done
 
 escaped_ssid=${WIFI_SSID//\"/\\\"}
 escaped_psk=${WIFI_PSK//\"/\\\"}
@@ -92,13 +94,14 @@ cat > "$WORK_DIR/root/usr/local/sbin/tv-kiosk-firstboot" <<EOF
 set -eu
 export KIOSK_PORT='$KIOSK_PORT'
 export KIOSK_UPDATE_BRANCH='$KIOSK_UPDATE_BRANCH'
-/opt/tv-kiosk-bootstrap/install.sh
 if [ -n '$KIOSK_REPO_URL' ]; then
-  cd /opt/tv-kiosk
-  git init
-  git remote add origin '$KIOSK_REPO_URL'
-  git fetch origin '$KIOSK_UPDATE_BRANCH'
-  git checkout -B '$KIOSK_UPDATE_BRANCH' 'origin/$KIOSK_UPDATE_BRANCH'
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y git
+  rm -rf /opt/tv-kiosk
+  git clone --branch '$KIOSK_UPDATE_BRANCH' --single-branch '$KIOSK_REPO_URL' /opt/tv-kiosk
+  /opt/tv-kiosk/install.sh
+else
+  /opt/tv-kiosk-bootstrap/install.sh
 fi
 systemctl disable tv-kiosk-firstboot.service
 reboot
@@ -122,7 +125,9 @@ WantedBy=multi-user.target
 EOF
 ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/tv-kiosk-firstboot.service"
 
-echo "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/default/crda"
+printf 'REGDOMAIN=%s\n' "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/default/crda"
+mkdir -p "$WORK_DIR/root/etc/wpa_supplicant"
+printf 'country=%s\n' "$WIFI_COUNTRY" > "$WORK_DIR/root/etc/wpa_supplicant/wpa_supplicant.conf"
 sync
 umount "$WORK_DIR/root"
 umount "$WORK_DIR/boot"
