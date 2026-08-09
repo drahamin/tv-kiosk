@@ -46,7 +46,9 @@ This downloads the latest official Raspberry Pi OS Lite 32-bit image, embeds
 the kiosk payload and Wi-Fi profile, and writes the finished image under
 `dist/`. The first boot installs the graphical packages, so allow roughly
 10–25 minutes before the display appears. No username entry is required: the
-image provisions a dedicated `kiosk` account and logs it in automatically.
+image provisions a dedicated `kiosk` account and logs it in automatically. A
+full-screen progress display shows the current installation stage and reports
+automatic retries if Wi-Fi or package installation is temporarily unavailable.
 
 For GitHub auto-updates, publish this repository first and pass its clone URL:
 

@@ -1,0 +1,24 @@
+[Unit]
+Description=Install Rahamin TV kiosk on first boot
+Wants=NetworkManager.service
+After=NetworkManager.service systemd-user-sessions.service
+Before=getty@tty1.service
+Conflicts=getty@tty1.service
+ConditionPathExists=/opt/tv-kiosk-bootstrap/install.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tv-kiosk-firstboot
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=1
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+[Install]
+WantedBy=multi-user.target

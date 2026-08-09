@@ -1,0 +1,80 @@
+#!/bin/sh
+set -eu
+
+BOOTSTRAP_ENV=${BOOTSTRAP_ENV:-/etc/tv-kiosk/bootstrap.env}
+LOG_FILE=/var/log/tv-kiosk-firstboot.log
+
+if [ -r "$BOOTSTRAP_ENV" ]; then
+  # This file is generated into the image and contains only kiosk settings.
+  . "$BOOTSTRAP_ENV"
+fi
+
+: "${KIOSK_PORT:=8999}"
+: "${KIOSK_UPDATE_BRANCH:=main}"
+: "${KIOSK_REPO_URL:=}"
+
+progress() {
+  printf '\n\033[1;36m[%s/6]\033[0m \033[1m%s\033[0m\n' "$1" "$2"
+}
+
+failed() {
+  status=$?
+  if [ "$status" -eq 0 ]; then
+    return
+  fi
+
+  printf '\n\033[1;31mINSTALLATION PAUSED\033[0m\n'
+  printf 'The kiosk will retry automatically in 30 seconds.\n'
+  printf 'Recent details:\n\n'
+  tail -n 12 "$LOG_FILE" 2>/dev/null || true
+  sleep 30
+}
+trap failed EXIT
+
+: > "$LOG_FILE"
+setfont /usr/share/consolefonts/Lat15-TerminusBold32x16.psf.gz 2>/dev/null || true
+printf '\033[2J\033[H'
+printf '\033[1;44;37m                                                    \033[0m\n'
+printf '\033[1;44;37m          RAHAMIN SAMSUNG TV KIOSK SETUP           \033[0m\n'
+printf '\033[1;44;37m                                                    \033[0m\n'
+printf '\nKeep this Raspberry Pi powered on. No input is required.\n'
+printf 'Initial setup normally takes 10 to 25 minutes.\n'
+
+progress 1 'Starting unattended kiosk setup'
+printf 'Boot services are ready.\n'
+
+progress 2 'Connecting to Wi-Fi and the internet'
+if ! nm-online --wait-for-startup --quiet --timeout=180 >> "$LOG_FILE" 2>&1; then
+  printf 'Wi-Fi is not ready yet. A retry will start automatically.\n' >> "$LOG_FILE"
+  exit 1
+fi
+printf 'Network connected.\n'
+
+if [ -n "$KIOSK_REPO_URL" ]; then
+  progress 3 'Installing GitHub download support'
+  apt-get update >> "$LOG_FILE" 2>&1
+  DEBIAN_FRONTEND=noninteractive apt-get install -y git >> "$LOG_FILE" 2>&1
+
+  progress 4 'Downloading the latest kiosk from GitHub'
+  rm -rf /opt/tv-kiosk
+  git clone --branch "$KIOSK_UPDATE_BRANCH" --single-branch "$KIOSK_REPO_URL" /opt/tv-kiosk >> "$LOG_FILE" 2>&1
+  INSTALLER=/opt/tv-kiosk/install.sh
+else
+  progress 3 'Preparing the built-in kiosk package'
+  printf 'Using the image\047s built-in kiosk files.\n'
+  progress 4 'Checking the built-in kiosk package'
+  INSTALLER=/opt/tv-kiosk-bootstrap/install.sh
+fi
+
+progress 5 'Installing the browser and full-screen display'
+printf 'This is the longest step and can take 10 to 20 minutes.\n'
+"$INSTALLER" >> "$LOG_FILE" 2>&1
+
+progress 6 'Setup complete — starting the TV kiosk'
+systemctl disable tv-kiosk-firstboot.service >> "$LOG_FILE" 2>&1
+sync
+printf '\nThe Raspberry Pi will reboot in 5 seconds.\n'
+printf 'After reboot, the three TV pages will start automatically.\n'
+trap - EXIT
+sleep 5
+reboot
