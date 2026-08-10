@@ -13,8 +13,16 @@ case "${1:-}" in
   reboot)
     systemd-run --quiet --unit=rahamin-kiosk-reboot --on-active=3s /usr/bin/systemctl reboot
     ;;
+  start-display)
+    rm -f /home/kiosk/.config/tv-kiosk/display-disabled
+    runuser -u kiosk -- env XDG_RUNTIME_DIR=/run/user/"$(id -u kiosk)" systemctl --user enable --now tv-kiosk-browser.service
+    ;;
+  stop-display)
+    install -m 0600 -o kiosk -g kiosk /dev/null /home/kiosk/.config/tv-kiosk/display-disabled
+    runuser -u kiosk -- env XDG_RUNTIME_DIR=/run/user/"$(id -u kiosk)" systemctl --user disable --now tv-kiosk-browser.service
+    ;;
   *)
-    echo "Allowed actions: force-update, reboot" >&2
+    echo "Allowed actions: force-update, reboot, start-display, stop-display" >&2
     exit 2
     ;;
 esac

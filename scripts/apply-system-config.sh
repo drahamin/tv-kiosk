@@ -25,7 +25,7 @@ install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cleanup" /usr/local/sbin/rahamin
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action" /usr/local/sbin/rahamin-kiosk-action
 printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/rahamin-kiosk-network\n' "$KIOSK_USER" > /etc/sudoers.d/90-rahamin-kiosk-network
 chmod 0440 /etc/sudoers.d/90-rahamin-kiosk-network
-printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/rahamin-kiosk-action force-update, /usr/local/sbin/rahamin-kiosk-action reboot\n' "$KIOSK_USER" > /etc/sudoers.d/91-rahamin-kiosk-action
+printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/rahamin-kiosk-action force-update, /usr/local/sbin/rahamin-kiosk-action reboot, /usr/local/sbin/rahamin-kiosk-action start-display, /usr/local/sbin/rahamin-kiosk-action stop-display\n' "$KIOSK_USER" > /etc/sudoers.d/91-rahamin-kiosk-action
 chmod 0440 /etc/sudoers.d/91-rahamin-kiosk-action
 
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user"
@@ -36,7 +36,12 @@ if ! cmp -s "$APP_DIR/systemd/tv-kiosk-browser.service" "$BROWSER_UNIT"; then
   BROWSER_CHANGED=true
 fi
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user/default.target.wants"
-ln -sf ../tv-kiosk-browser.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-browser.service"
+DISPLAY_DISABLED="/home/$KIOSK_USER/.config/tv-kiosk/display-disabled"
+if [ -e "$DISPLAY_DISABLED" ]; then
+  rm -f "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-browser.service"
+else
+  ln -sf ../tv-kiosk-browser.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-browser.service"
+fi
 
 # Commit helpers, sudo rules, and the browser unit to storage before any browser
 # load is started. This protects the installation if an undervoltage reset occurs.
@@ -44,13 +49,17 @@ sync
 
 if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user daemon-reload || true
-  runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-browser.service || true
+  if [ -e "$DISPLAY_DISABLED" ]; then
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user disable --now tv-kiosk-browser.service || true
+  else
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-browser.service || true
+  fi
   if [ -f "/home/$KIOSK_USER/.config/tv-kiosk/browser-controller.py" ]; then
     pkill -u "$KIOSK_USER" -f "/home/$KIOSK_USER/.config/tv-kiosk/browser-controller.py" 2>/dev/null || true
     rm -f "/home/$KIOSK_USER/.config/tv-kiosk/browser-controller.py"
     BROWSER_CHANGED=true
   fi
-  if [ "$BROWSER_CHANGED" = true ]; then
+  if [ "$BROWSER_CHANGED" = true ] && [ ! -e "$DISPLAY_DISABLED" ]; then
     runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-browser.service || true
   fi
 fi
