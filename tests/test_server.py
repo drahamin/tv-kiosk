@@ -81,6 +81,8 @@ class KioskServerTests(unittest.TestCase):
         self.assertIn("NETWORK CONFIGURATION", body)
         self.assertIn("Raspberry Pi health", body)
         self.assertIn("Force update now", body)
+        self.assertIn("Start display", body)
+        self.assertIn("Stop display", body)
         self.assertIn("Reboot Pi", body)
         self.assertIn("Change administrator login", body)
 
