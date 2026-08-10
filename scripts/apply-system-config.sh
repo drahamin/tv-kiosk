@@ -9,6 +9,16 @@ fi
 APP_DIR=${KIOSK_APP_DIR:-/opt/tv-kiosk}
 KIOSK_USER=${KIOSK_USER:-kiosk}
 KIOSK_UID=$(id -u "$KIOSK_USER")
+STATE_DIR=/var/lib/rahamin-kiosk
+
+# Early images could leave the dedicated home owned by root, which prevents
+# pcmanfm, Chromium, and WirePlumber from creating normal session state.
+if [ ! -e "$STATE_DIR/home-ownership-v1" ]; then
+  install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/Desktop" "/home/$KIOSK_USER/.cache" "/home/$KIOSK_USER/.local/state"
+  chown -R "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER"
+  install -d -m 0755 "$STATE_DIR"
+  touch "$STATE_DIR/home-ownership-v1"
+fi
 
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-network" /usr/local/sbin/rahamin-kiosk-network
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cleanup" /usr/local/sbin/rahamin-kiosk-cleanup
