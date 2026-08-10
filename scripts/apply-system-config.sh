@@ -28,6 +28,10 @@ fi
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user/default.target.wants"
 ln -sf ../tv-kiosk-browser.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-browser.service"
 
+# Commit helpers, sudo rules, and the browser unit to storage before any browser
+# load is started. This protects the installation if an undervoltage reset occurs.
+sync
+
 if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user daemon-reload || true
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-browser.service || true
