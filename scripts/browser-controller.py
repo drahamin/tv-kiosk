@@ -72,19 +72,16 @@ def close(tab_id):
         pass
 
 
-def replace_tabs(config, old_ids):
-    new_ids = []
-    for page in config["pages"]:
-        target = open_tab(page["url"])
-        new_ids.append(target["id"])
-    activate(new_ids[0])
-    for tab_id in old_ids:
-        if tab_id not in new_ids:
-            close(tab_id)
+def replace_tab(url, old_id=None):
+    target = open_tab(url)
+    new_id = target["id"]
+    activate(new_id)
+    if old_id and old_id != new_id:
+        close(old_id)
     for target in devtools("/json/list"):
-        if target.get("type") == "page" and target.get("id") not in new_ids:
+        if target.get("type") == "page" and target.get("id") != new_id:
             close(target["id"])
-    return new_ids
+    return new_id
 
 
 def launch_chromium():
@@ -116,7 +113,7 @@ def launch_chromium():
 def supervise():
     while running:
         process = launch_chromium()
-        tab_ids = []
+        tab_id = None
         try:
             wait_for_chromium(process)
             fingerprint = None
@@ -126,14 +123,14 @@ def supervise():
                 config = load_config()
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
-                    tab_ids = replace_tabs(config, tab_ids)
+                    tab_id = replace_tab(config["pages"][0]["url"], tab_id)
                     fingerprint = new_fingerprint
                     current = 0
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                     print("Loaded kiosk playlist:", ", ".join(page["name"] for page in config["pages"]), flush=True)
                 if time.monotonic() >= next_rotation:
-                    current = (current + 1) % len(tab_ids)
-                    activate(tab_ids[current])
+                    current = (current + 1) % len(config["pages"])
+                    tab_id = replace_tab(config["pages"][current]["url"], tab_id)
                     print(f"Showing page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                 time.sleep(1)
