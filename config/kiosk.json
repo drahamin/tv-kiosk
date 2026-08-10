@@ -1,5 +1,11 @@
 {
+  "title": "Rahamin TV Kiosk",
+  "listen_port": 8999,
   "rotation_seconds": 25,
+  "transition_seconds": 0.7,
+  "show_status": true,
+  "background": "#080706",
+  "theme": "baiamonte",
   "pages": [
     {
       "name": "Rahamin ADS-B TV",

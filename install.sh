@@ -38,9 +38,9 @@ if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
 fi
 
 chown -R root:root "$APP_DIR"
-chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh"
+chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py"
 
-mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox"
+mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/tv-kiosk"
 cat > /etc/tv-kiosk/kiosk.env <<EOF
 KIOSK_PORT=$KIOSK_PORT
 KIOSK_UPDATE_BRANCH=$KIOSK_UPDATE_BRANCH
@@ -55,9 +55,14 @@ user-session=openbox
 xserver-command=X -s 0 -dpms
 EOF
 
-sed "s#127.0.0.1:8999#127.0.0.1:$KIOSK_PORT#" "$APP_DIR/session/openbox-autostart" > "/home/$KIOSK_USER/.config/openbox/autostart"
-chown -R "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER/.config"
+cp "$APP_DIR/session/openbox-autostart" "/home/$KIOSK_USER/.config/openbox/autostart"
+cp "$APP_DIR/session/labwc-autostart" "/home/$KIOSK_USER/.config/labwc/autostart"
+if [ ! -e "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" ]; then
+  cp "$APP_DIR/config/kiosk.json" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
+fi
+chown -R "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER"
 chmod +x "/home/$KIOSK_USER/.config/openbox/autostart"
+chmod +x "/home/$KIOSK_USER/.config/labwc/autostart"
 
 install -m 0644 "$APP_DIR/systemd/tv-kiosk-web.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/systemd/tv-kiosk-update.service" /etc/systemd/system/
