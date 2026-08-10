@@ -2,4 +2,4 @@ xset s off
 xset s noblank
 xset -dpms
 unclutter -idle 1 -root &
-chromium --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --no-first-run --incognito --disable-pinch --overscroll-history-navigation=0 http://127.0.0.1:8999/tv &
+/opt/tv-kiosk/scripts/launch-browser.sh &

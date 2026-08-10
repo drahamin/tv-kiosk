@@ -12,6 +12,11 @@ The local kiosk listens on port `8999` by default and exposes:
 - `/` and `/tv` — rotating three-page kiosk
 - `/airport-tv` and `/tv/airport` — full-screen airport board
 - `/healthz` — health check
+- `/admin` — Baiamonte-themed kiosk administration
+
+The initial administrator login is `admin` / `admin`. Change it from the
+Security section after the first sign-in. Passwords are stored as salted
+PBKDF2 hashes, and the admin session uses an HTTP-only local cookie.
 
 ## Quick install on Raspberry Pi OS
 
@@ -22,13 +27,22 @@ sudo ./install.sh
 ```
 
 The installer creates a dedicated `kiosk` account, configures graphical
-autologin, starts Chromium in kiosk mode, enables Wi-Fi, and installs an update
-timer. Reboot when it completes.
+autologin for both current Wayland/labwc and older Openbox releases, starts
+Chromium in kiosk mode, enables Wi-Fi, and installs an update timer. Reboot
+when it completes.
 
 ## Configuration
 
-Edit `config/kiosk.json` to change URLs or the rotation interval. Set the local
-HTTP port with `KIOSK_PORT` in `/etc/tv-kiosk/kiosk.env` (default `8999`).
+Use `/admin` to change all three page names and URLs, rotation and crossfade
+timing, theme, screen background, title, web port, and administrator login.
+Runtime settings are stored outside the Git checkout under
+`~kiosk/.config/tv-kiosk`, so automatic updates do not overwrite them. Port
+changes apply after a restart.
+
+The attached TV uses a small browser controller that rotates full Chromium
+tabs. This intentionally avoids iframe restrictions such as
+`X-Frame-Options: SAMEORIGIN` on the ADS-B and airport-board servers. Chromium
+uses basic local password storage so a kiosk never displays a keyring prompt.
 
 The updater runs five minutes after boot and every five minutes thereafter. It
 uses the checkout's `origin` remote and only accepts fast-forward updates from
