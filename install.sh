@@ -12,6 +12,9 @@ KIOSK_USER=${KIOSK_USER:-kiosk}
 KIOSK_PORT=${KIOSK_PORT:-8999}
 KIOSK_UPDATE_BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 
+HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
+echo "Installing Rahamin Kiosk on $HARDWARE_MODEL"
+
 if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
   apt-get update
 fi

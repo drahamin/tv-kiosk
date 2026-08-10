@@ -52,7 +52,7 @@ mkdir -p "$DIST_DIR" "$WORK_DIR/root"
 curl -fL "$RPI_OS_IMAGE_URL" -o "$WORK_DIR/os.img.xz"
 xz -dc "$WORK_DIR/os.img.xz" > "$WORK_DIR/os.img"
 BASE_IMAGE="$WORK_DIR/os.img"
-OUTPUT_IMAGE="$DIST_DIR/rahamin-tv-kiosk-rpi3.img"
+OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-rpi3-rpi4.img"
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
 
 read -r BOOT_START BOOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 1 "$OUTPUT_IMAGE")
