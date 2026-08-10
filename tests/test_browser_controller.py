@@ -1,7 +1,7 @@
 import importlib.util
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "browser-controller.py"
 spec = importlib.util.spec_from_file_location("browser_controller", MODULE_PATH)
@@ -10,6 +10,12 @@ spec.loader.exec_module(controller)
 
 
 class BrowserControllerTests(unittest.TestCase):
+    def test_devtools_accepts_plain_text_activation_response(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"Target activated"
+        with patch.object(controller, "urlopen", return_value=response):
+            self.assertEqual(controller.devtools("/json/activate/example"), "Target activated")
+
     def test_replace_tab_keeps_only_one_full_page_loaded(self):
         targets = [
             {"id": "new", "type": "page"},
