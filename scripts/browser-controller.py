@@ -94,7 +94,7 @@ def launch_chromium():
     cache.mkdir(parents=True, exist_ok=True)
     command = [
         CHROMIUM,
-        "--ozone-platform-hint=auto",
+        "--ozone-platform=wayland",
         "--password-store=basic",
         f"--user-data-dir={profile}",
         f"--disk-cache-dir={cache}",
@@ -134,6 +134,7 @@ def supervise():
                 if time.monotonic() >= next_rotation:
                     current = (current + 1) % len(tab_ids)
                     activate(tab_ids[current])
+                    print(f"Showing page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                 time.sleep(1)
         except Exception as exc:
