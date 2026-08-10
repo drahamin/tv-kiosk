@@ -1,4 +1,4 @@
-# Rahamin Kiosk for Raspberry Pi 3
+# Rahamin Kiosk for Raspberry Pi 3 and Raspberry Pi 4
 
 Rahamin Kiosk is a full-screen, remotely managed display for a 75-inch 16:9
 Samsung television. It can rotate up to five enabled web pages at a configurable
@@ -60,9 +60,14 @@ updates, and installs supervised browser recovery. It also disables unused
 Bluetooth and NFS/RPC services and safely trims old package archives, logs, and
 crash reports without removing required Raspberry Pi components.
 
+The same image supports Raspberry Pi 3B/3B+ and Raspberry Pi 4B. Pi 4 uses its
+first micro-HDMI port and should use a proper 5V/3A USB-C supply. Pi 3 should use
+a reliable 5V/2.5A micro-USB supply. Undervoltage can reset either model while
+Chromium is loading map pages.
+
 The attached TV rotates full Chromium tabs instead of embedding remote pages.
 This avoids remote `X-Frame-Options` restrictions and keeps memory use reasonable
-on a Raspberry Pi 3.
+on both supported models.
 
 ## GitHub updates
 
@@ -80,9 +85,10 @@ On an Ubuntu Linux machine with `sudo`, `curl`, `xz`, `losetup`, `mtools`, and
 sudo ./image/build-image.sh
 ```
 
-The builder downloads Raspberry Pi OS Desktop 32-bit, provisions the `kiosk`
+The builder downloads Raspberry Pi OS Desktop 32-bit for Pi 3 and Pi 4, provisions the `kiosk`
 account, enables key-only SSH, embeds DHCP Ethernet and Wi-Fi profiles, includes
-the kiosk, and writes the image under `dist/`. On first boot, a full-screen
+the kiosk, and writes `dist/rahamin-kiosk-rpi3-rpi4.img` plus its compressed
+`.xz` file. On first boot, a full-screen
 progress display reports every installation stage and automatic retry. After the
 reboot, the configuration screen displays the address to use from a phone or
 computer on the same network.

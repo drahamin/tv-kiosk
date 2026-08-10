@@ -41,6 +41,16 @@ printf '\033[1;44;37m                                                    \033[0m
 printf '\nKeep this Raspberry Pi powered on. No input is required.\n'
 printf 'Initial setup normally takes 10 to 25 minutes.\n'
 
+HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
+case "$HARDWARE_MODEL" in
+  *"Raspberry Pi 3"*|*"Raspberry Pi 4"*)
+    printf 'Detected supported hardware: %s\n' "$HARDWARE_MODEL"
+    ;;
+  *)
+    printf 'Detected hardware: %s (continuing with standard settings)\n' "$HARDWARE_MODEL"
+    ;;
+esac
+
 progress 1 'Starting unattended kiosk setup'
 printf 'Boot services are ready.\n'
 
