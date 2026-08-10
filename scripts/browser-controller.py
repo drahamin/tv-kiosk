@@ -42,7 +42,12 @@ def devtools(path, method="GET", timeout=3):
     request = Request(f"http://127.0.0.1:{DEBUG_PORT}{path}", method=method)
     with urlopen(request, timeout=timeout) as response:
         payload = response.read()
-    return json.loads(payload) if payload else None
+    if not payload:
+        return None
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError:
+        return payload.decode("utf-8", errors="replace")
 
 
 def wait_for_chromium(process):
