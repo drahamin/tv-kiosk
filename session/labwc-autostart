@@ -1,1 +1,1 @@
-/opt/tv-kiosk/scripts/launch-browser.sh &
+systemctl --user restart tv-kiosk-browser.service &

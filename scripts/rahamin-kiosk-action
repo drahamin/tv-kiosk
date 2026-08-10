@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Rahamin Kiosk system action must run as root" >&2
+  exit 1
+fi
+
+case "${1:-}" in
+  force-update)
+    systemctl start --no-block tv-kiosk-update.service
+    ;;
+  reboot)
+    systemd-run --quiet --unit=rahamin-kiosk-reboot --on-active=3s /usr/bin/systemctl reboot
+    ;;
+  *)
+    echo "Allowed actions: force-update, reboot" >&2
+    exit 2
+    ;;
+esac

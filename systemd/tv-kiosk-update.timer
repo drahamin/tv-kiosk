@@ -1,5 +1,5 @@
 [Unit]
-Description=Check GitHub for Rahamin TV kiosk updates
+Description=Check GitHub for Rahamin Kiosk updates
 
 [Timer]
 OnBootSec=5min

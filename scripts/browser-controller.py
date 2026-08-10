@@ -29,9 +29,12 @@ def load_config():
     source = CONFIG_PATH if CONFIG_PATH.exists() else DEFAULT_CONFIG
     with source.open(encoding="utf-8") as handle:
         config = json.load(handle)
-    pages = config.get("pages", [])
-    if len(pages) != 3:
-        raise ValueError("kiosk browser requires exactly three pages")
+    if not config.get("setup_complete", True):
+        port = int(config.get("listen_port", 8999))
+        return {"rotation_seconds": 3600, "pages": [{"name": "Configure Rahamin Kiosk", "url": f"http://127.0.0.1:{port}/setup"}]}
+    pages = [page for page in config.get("pages", []) if page.get("enabled", True) and page.get("url")]
+    if not 1 <= len(pages) <= 5:
+        raise ValueError("Rahamin Kiosk requires one to five enabled pages")
     return {
         "rotation_seconds": max(5, int(config.get("rotation_seconds", 25))),
         "pages": [{"name": str(page["name"]), "url": str(page["url"])} for page in pages],

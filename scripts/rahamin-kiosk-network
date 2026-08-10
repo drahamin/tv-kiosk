@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Apply a validated Rahamin Kiosk network request as root."""
+
+import ipaddress
+import json
+import re
+import subprocess
+import time
+from pathlib import Path
+
+REQUEST = Path("/home/kiosk/.config/tv-kiosk/network-request.json")
+STATUS = Path("/home/kiosk/.config/tv-kiosk/network-status.json")
+
+
+def run(*args, check=True):
+    return subprocess.run(args, check=check, capture_output=True, text=True, timeout=30)
+
+
+def valid_hostname(value):
+    return bool(re.fullmatch(r"(?=.{1,63}$)[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", value))
+
+
+def validate_ip_settings(prefix, data, version):
+    mode = data[f"{prefix}_mode"]
+    allowed = ("auto", "manual") if version == 4 else ("auto", "manual", "disabled")
+    if mode not in allowed:
+        raise ValueError(f"Invalid {prefix} mode")
+    if mode == "manual":
+        ipaddress.ip_interface(data[f"{prefix}_address"])
+        if data[f"{prefix}_gateway"]:
+            ipaddress.ip_address(data[f"{prefix}_gateway"])
+        for server in data[f"{prefix}_dns"].replace(",", " ").split():
+            if ipaddress.ip_address(server).version != version:
+                raise ValueError(f"Invalid {prefix} DNS server")
+
+
+def connection_for(device, fallback_name, kind):
+    current = run("nmcli", "-g", "GENERAL.CONNECTION", "device", "show", device, check=False).stdout.strip()
+    if current and current != "--":
+        return current
+    rows = run("nmcli", "-t", "-f", "NAME,TYPE", "connection", "show", check=False).stdout.splitlines()
+    expected = "802-11-wireless" if kind == "wifi" else "802-3-ethernet"
+    for row in rows:
+        name, _, connection_type = row.partition(":")
+        if connection_type == expected:
+            return name
+    if kind == "wifi":
+        run("nmcli", "connection", "add", "type", "wifi", "ifname", device, "con-name", fallback_name, "ssid", "Rahamin")
+    else:
+        run("nmcli", "connection", "add", "type", "ethernet", "ifname", device, "con-name", fallback_name)
+    return fallback_name
+
+
+def apply_ip(connection, prefix, data, version):
+    family = f"ipv{version}"
+    mode = data[f"{prefix}_mode"]
+    run("nmcli", "connection", "modify", connection, f"{family}.method", mode)
+    if mode == "manual":
+        run("nmcli", "connection", "modify", connection, f"{family}.addresses", data[f"{prefix}_address"])
+        run("nmcli", "connection", "modify", connection, f"{family}.gateway", data[f"{prefix}_gateway"])
+        dns = " ".join(data[f"{prefix}_dns"].replace(",", " ").split())
+        run("nmcli", "connection", "modify", connection, f"{family}.dns", dns, f"{family}.ignore-auto-dns", "yes" if dns else "no")
+    else:
+        run("nmcli", "connection", "modify", connection, f"{family}.addresses", "", f"{family}.gateway", "", f"{family}.dns", "", f"{family}.ignore-auto-dns", "no")
+
+
+def apply(data):
+    if not valid_hostname(data["hostname"]):
+        raise ValueError("Invalid hostname")
+    if not 1 <= len(data["wifi_ssid"]) <= 32:
+        raise ValueError("Wi-Fi SSID must be 1–32 characters")
+    if data["wifi_security"] not in ("wpa-psk", "open"):
+        raise ValueError("Invalid Wi-Fi security")
+    if data["wifi_password"] and not 8 <= len(data["wifi_password"]) <= 63:
+        raise ValueError("Wi-Fi password must be 8–63 characters")
+    if data["wifi_mac_policy"] not in ("preserve", "permanent", "random"):
+        raise ValueError("Invalid Wi-Fi MAC policy")
+    for prefix, version in (("wifi_ipv4", 4), ("wifi_ipv6", 6), ("ethernet_ipv4", 4), ("ethernet_ipv6", 6)):
+        validate_ip_settings(prefix, data, version)
+
+    run("hostnamectl", "set-hostname", data["hostname"])
+    wifi = connection_for("wlan0", "Rahamin WiFi", "wifi")
+    run("nmcli", "connection", "modify", wifi, "connection.autoconnect", "yes" if data["wifi_autoconnect"] else "no", "802-11-wireless.ssid", data["wifi_ssid"])
+    if data["wifi_mac_policy"] == "preserve":
+        run("nmcli", "connection", "modify", wifi, "802-11-wireless.cloned-mac-address", "preserve")
+    else:
+        run("nmcli", "connection", "modify", wifi, "802-11-wireless.cloned-mac-address", data["wifi_mac_policy"])
+    if data["wifi_security"] == "open":
+        run("nmcli", "connection", "modify", wifi, "802-11-wireless-security.key-mgmt", "", "802-11-wireless-security.psk", "")
+    else:
+        run("nmcli", "connection", "modify", wifi, "802-11-wireless-security.key-mgmt", "wpa-psk")
+        if data["wifi_password"]:
+            run("nmcli", "connection", "modify", wifi, "802-11-wireless-security.psk", data["wifi_password"])
+    apply_ip(wifi, "wifi_ipv4", data, 4)
+    apply_ip(wifi, "wifi_ipv6", data, 6)
+
+    ethernet = connection_for("eth0", "Rahamin Ethernet", "ethernet")
+    run("nmcli", "connection", "modify", ethernet, "connection.autoconnect", "yes" if data["ethernet_enabled"] else "no")
+    apply_ip(ethernet, "ethernet_ipv4", data, 4)
+    apply_ip(ethernet, "ethernet_ipv6", data, 6)
+    if not data["ethernet_enabled"]:
+        run("nmcli", "connection", "down", ethernet, check=False)
+
+    run("nmcli", "radio", "wifi", "on" if data["wifi_enabled"] else "off")
+    if data["wifi_enabled"]:
+        run("nmcli", "connection", "up", wifi)
+    if data["ethernet_enabled"]:
+        run("nmcli", "connection", "up", ethernet, check=False)
+
+
+def write_status(ok, message):
+    STATUS.write_text(json.dumps({"ok": ok, "message": message, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S %Z")}, indent=2) + "\n", encoding="utf-8")
+    STATUS.chmod(0o600)
+    subprocess.run(["chown", "kiosk:kiosk", str(STATUS)], check=False)
+
+
+def main():
+    try:
+        data = json.loads(REQUEST.read_text(encoding="utf-8"))
+        apply(data)
+        write_status(True, "Network configuration applied")
+    except Exception as exc:
+        write_status(False, f"Network configuration failed: {exc}")
+        raise
+
+
+if __name__ == "__main__":
+    main()

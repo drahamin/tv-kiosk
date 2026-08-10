@@ -18,11 +18,13 @@ class KioskServerTests(unittest.TestCase):
             "transition_seconds": 0.7,
             "show_status": True,
             "background": "#080706",
-            "theme": "baiamonte",
+            "theme": "rahamin",
             "pages": [
-                {"name": "One", "url": "http://example.test/one"},
-                {"name": "Two", "url": "http://example.test/two"},
-                {"name": "Board", "url": "http://example.test/board"},
+                {"name": "One", "url": "http://example.test/one", "enabled": True},
+                {"name": "Two", "url": "http://example.test/two", "enabled": False},
+                {"name": "Airport Board", "url": "http://example.test/board", "enabled": True},
+                {"name": "Four", "url": "", "enabled": False},
+                {"name": "Five", "url": "", "enabled": False},
             ],
         }
         config_path = Path(self.tmp.name) / "kiosk.json"
@@ -43,11 +45,11 @@ class KioskServerTests(unittest.TestCase):
         status, _content_type, body = self.module.render_path(path, self.config)
         return status, body
 
-    def test_rotation_page_has_all_three_urls_and_interval(self):
+    def test_rotation_page_includes_enabled_pages_only(self):
         status, body = self.get("/tv")
         self.assertEqual(status, 200)
         self.assertIn("example.test/one", body)
-        self.assertIn("example.test/two", body)
+        self.assertNotIn("example.test/two", body)
         self.assertIn("example.test/board", body)
         self.assertIn('"rotation_seconds":25', body)
 
@@ -61,7 +63,7 @@ class KioskServerTests(unittest.TestCase):
     def test_health(self):
         status, body = self.get("/healthz")
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body), {"status": "ok"})
+        self.assertEqual(json.loads(body), {"status": "ok", "name": "Rahamin Kiosk"})
 
     def test_default_admin_login_and_change(self):
         self.assertTrue(self.module.check_credentials("admin", "admin"))
@@ -69,12 +71,17 @@ class KioskServerTests(unittest.TestCase):
         self.assertFalse(self.module.check_credentials("admin", "admin"))
         self.assertTrue(self.module.check_credentials("captain", "new-secret"))
 
-    def test_admin_page_uses_baiamonte_theme_and_all_settings(self):
+    def test_admin_page_uses_rahamin_name_and_management_sections(self):
         _token, csrf = self.module.new_session("admin")
         body = self.module.admin_page(self.config, {"username": "admin", "csrf": csrf})
-        self.assertIn("BAIAMONTE", body)
+        self.assertIn("Rahamin Kiosk", body)
         self.assertIn("Rotation time", body)
         self.assertIn("Web port", body)
+        self.assertIn("Up to five full-screen pages", body)
+        self.assertIn("NETWORK CONFIGURATION", body)
+        self.assertIn("Raspberry Pi health", body)
+        self.assertIn("Force update now", body)
+        self.assertIn("Reboot Pi", body)
         self.assertIn("Change administrator login", body)
 
     def test_rejects_non_http_page_url(self):
@@ -83,6 +90,42 @@ class KioskServerTests(unittest.TestCase):
         broken["pages"][0]["url"] = "file:///etc/passwd"
         with self.assertRaises(ValueError):
             self.module.validate_config(broken)
+
+    def test_migrates_three_old_pages_to_five(self):
+        old = {**self.config, "pages": self.config["pages"][:3]}
+        for page in old["pages"]:
+            page.pop("enabled", None)
+        migrated = self.module.validate_config(old)
+        self.assertEqual(len(migrated["pages"]), 5)
+        self.assertTrue(all(page["enabled"] for page in migrated["pages"][:3]))
+        self.assertFalse(any(page["enabled"] for page in migrated["pages"][3:]))
+
+    def test_requires_at_least_one_enabled_page(self):
+        broken = {**self.config, "pages": [{**page, "enabled": False} for page in self.config["pages"]]}
+        with self.assertRaises(ValueError):
+            self.module.validate_config(broken)
+
+    def test_validates_full_network_request(self):
+        form = {
+            "hostname": "rahamin-kiosk",
+            "wifi_enabled": "on",
+            "wifi_autoconnect": "on",
+            "wifi_ssid": "Home",
+            "wifi_password": "",
+            "wifi_security": "wpa-psk",
+            "wifi_mac_policy": "preserve",
+            "ethernet_enabled": "on",
+            "wifi_ipv4_mode": "auto",
+            "wifi_ipv6_mode": "auto",
+            "ethernet_ipv4_mode": "manual",
+            "ethernet_ipv4_address": "192.168.86.50/24",
+            "ethernet_ipv4_gateway": "192.168.86.1",
+            "ethernet_ipv4_dns": "1.1.1.1",
+            "ethernet_ipv6_mode": "disabled",
+        }
+        result = self.module.validate_network_request(form)
+        self.assertEqual(result["ethernet_ipv4_address"], "192.168.86.50/24")
+        self.assertTrue(result["wifi_enabled"])
 
 
 if __name__ == "__main__":

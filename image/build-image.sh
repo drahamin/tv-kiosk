@@ -106,6 +106,23 @@ method=auto
 EOF
 chmod 600 "$WORK_DIR/root/etc/NetworkManager/system-connections/Home.nmconnection"
 
+cat > "$WORK_DIR/root/etc/NetworkManager/system-connections/Rahamin-Ethernet.nmconnection" <<EOF
+[connection]
+id=Rahamin Ethernet
+type=ethernet
+interface-name=eth0
+autoconnect=true
+
+[ethernet]
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+EOF
+chmod 600 "$WORK_DIR/root/etc/NetworkManager/system-connections/Rahamin-Ethernet.nmconnection"
+
 printf 'tv-kiosk\n' > "$WORK_DIR/root/etc/hostname"
 if grep -q '^127\.0\.1\.1' "$WORK_DIR/root/etc/hosts"; then
   sed -i 's/^127\.0\.1\.1.*/127.0.1.1\ttv-kiosk/' "$WORK_DIR/root/etc/hosts"

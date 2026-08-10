@@ -1,23 +1,37 @@
 {
-  "title": "Rahamin TV Kiosk",
+  "title": "Rahamin Kiosk",
   "listen_port": 8999,
   "rotation_seconds": 25,
   "transition_seconds": 0.7,
   "show_status": true,
   "background": "#080706",
-  "theme": "baiamonte",
+  "theme": "rahamin",
+  "setup_complete": false,
   "pages": [
     {
       "name": "Rahamin ADS-B TV",
-      "url": "http://192.168.86.155:8998/tv"
+      "url": "http://192.168.86.155:8998/tv",
+      "enabled": true
     },
     {
       "name": "Rahamin AIS TV",
-      "url": "http://192.168.86.196:8999/tv?area=miami"
+      "url": "http://192.168.86.196:8999/tv?area=miami",
+      "enabled": true
     },
     {
       "name": "Airport / Samsung TV Board",
-      "url": "http://192.168.86.155:8999/tv"
+      "url": "http://192.168.86.155:8999/tv",
+      "enabled": true
+    },
+    {
+      "name": "Page 4",
+      "url": "",
+      "enabled": false
+    },
+    {
+      "name": "Page 5",
+      "url": "",
+      "enabled": false
     }
   ]
 }

@@ -1,87 +1,98 @@
-# TV Kiosk for Raspberry Pi 3
+# Rahamin Kiosk for Raspberry Pi 3
 
-This repository builds and installs a full-screen Raspberry Pi kiosk for a
-75-inch 16:9 television. The kiosk rotates three pages every 25 seconds:
+Rahamin Kiosk is a full-screen, remotely managed display for a 75-inch 16:9
+Samsung television. It can rotate up to five enabled web pages at a configurable
+interval. The default playlist rotates every 25 seconds:
 
 1. Rahamin ADS-B TV
 2. Rahamin AIS TV (Miami)
 3. Airport / Samsung TV board
 
-The local kiosk listens on port `8999` by default and exposes:
+The local service listens on port `8999` by default and provides:
 
-- `/` and `/tv` — rotating three-page kiosk
+- `/` and `/tv` — rotating full-screen playlist
 - `/airport-tv` and `/tv/airport` — full-screen airport board
+- `/setup` — first-deployment instructions and detected DHCP addresses
 - `/healthz` — health check
-- `/admin` — Baiamonte-themed kiosk administration
+- `/admin` — Rahamin Kiosk administration
 
-The initial administrator login is `admin` / `admin`. Change it from the
-Security section after the first sign-in. Passwords are stored as salted
-PBKDF2 hashes, and the admin session uses an HTTP-only local cookie.
+## First deployment
+
+Ethernet and the preloaded `Home` Wi-Fi connection both use DHCP. A new image
+opens the setup screen on the TV and displays every detected IPv4 address, the
+`.local` address, and the admin URL. No keyboard is required.
+
+The initial administrator login is `admin` / `admin`. Change it after signing
+in, then enable **Setup complete** to start the playlist. Existing installations
+keep their current login and runtime settings during installs and GitHub updates.
+
+## Administration
+
+The control center supports:
+
+- up to five saved pages, individual enable/disable controls, and connection tests;
+- rotation timing, transition timing, display colors, themes, title, and web port;
+- Raspberry Pi temperature, load, memory, disk, uptime, software revision, and
+  service status;
+- Wi-Fi, Ethernet, DHCP or static IPv4, IPv6, DNS, gateway, hostname, Wi-Fi
+  credentials, autoconnect, radio state, and MAC policy;
+- configuration backup, secure password changes, live status refresh, display
+  restart, forced GitHub update, and clean Raspberry Pi reboot.
+
+Static address fields remain blank while DHCP is selected. Network changes can
+move the admin page to a new address. Saved Wi-Fi passwords are never displayed.
+Passwords are stored as salted PBKDF2 hashes and sessions use HTTP-only cookies.
+
+Runtime state is stored outside the Git checkout under
+`/home/kiosk/.config/tv-kiosk`, so automatic updates do not overwrite it.
 
 ## Quick install on Raspberry Pi OS
 
-Flash Raspberry Pi OS (32-bit) and then run:
+Flash Raspberry Pi OS Desktop (32-bit), then run:
 
 ```sh
 sudo ./install.sh
 ```
 
-The installer creates a dedicated `kiosk` account, configures graphical
-autologin for both current Wayland/labwc and older Openbox releases, starts
-Chromium in kiosk mode, enables Wi-Fi, and installs an update timer. Reboot
-when it completes.
+The installer configures graphical autologin, prevents login and keyring prompts,
+starts Chromium in kiosk mode, installs the web control center, enables GitHub
+updates, and installs supervised browser recovery. It also disables unused
+Bluetooth and NFS/RPC services and safely trims old package archives, logs, and
+crash reports without removing required Raspberry Pi components.
 
-## Configuration
+The attached TV rotates full Chromium tabs instead of embedding remote pages.
+This avoids remote `X-Frame-Options` restrictions and keeps memory use reasonable
+on a Raspberry Pi 3.
 
-Use `/admin` to change all three page names and URLs, rotation and crossfade
-timing, theme, screen background, title, web port, and administrator login.
-Runtime settings are stored outside the Git checkout under
-`~kiosk/.config/tv-kiosk`, so automatic updates do not overwrite them. Port
-changes apply after a restart.
+## GitHub updates
 
-The attached TV uses a small browser controller that rotates full Chromium
-tabs. This intentionally avoids iframe restrictions such as
-`X-Frame-Options: SAMEORIGIN` on the ADS-B and airport-board servers. Chromium
-uses basic local password storage so a kiosk never displays a keyring prompt.
-
-The updater runs five minutes after boot and every five minutes thereafter. It
-uses the checkout's `origin` remote and only accepts fast-forward updates from
-the configured branch.
+The updater checks five minutes after boot and every five minutes thereafter. It
+accepts fast-forward updates from the configured branch, reapplies the system
+configuration, and restarts the managed services. Local runtime settings and the
+changed administrator password remain untouched.
 
 ## Build a flashable image
 
-On an Ubuntu Linux machine with `sudo`, `curl`, `unzip`, `losetup`, and `mount`:
+On an Ubuntu Linux machine with `sudo`, `curl`, `xz`, `losetup`, `mtools`, and
+`mount` installed:
 
 ```sh
 sudo ./image/build-image.sh
 ```
 
-This downloads the latest official Raspberry Pi OS Desktop 32-bit image, embeds
-the kiosk payload and Wi-Fi profile, and writes the finished image under
-`dist/`. The desktop and Chromium are already present, shortening first setup.
-Allow roughly 5–15 minutes before the display appears. No username entry is required: the
-image provisions a dedicated `kiosk` account and logs it in automatically. A
-full-screen progress display shows the current installation stage and reports
-automatic retries if Wi-Fi or package installation is temporarily unavailable.
-Once connected, it also shows the Pi's current IP address for remote support.
-The wireless country and rfkill state are applied before NetworkManager starts,
-so Wi-Fi comes online without a keyboard or configuration prompt.
+The builder downloads Raspberry Pi OS Desktop 32-bit, provisions the `kiosk`
+account, enables key-only SSH, embeds DHCP Ethernet and Wi-Fi profiles, includes
+the kiosk, and writes the image under `dist/`. On first boot, a full-screen
+progress display reports every installation stage and automatic retry. After the
+reboot, the configuration screen displays the address to use from a phone or
+computer on the same network.
 
-The image also enables key-only SSH maintenance as `kiosk@tv-kiosk.local` from
-the first boot. Password and root SSH logins are disabled. The public key is
-embedded in the image; its private key stays in `image/kiosk_admin_ed25519` and
-is excluded from Git.
-
-For GitHub auto-updates, publish this repository first and pass its clone URL:
+For GitHub auto-updates, publish the repository and pass its clone URL:
 
 ```sh
 sudo KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git ./image/build-image.sh
 ```
 
-Wi-Fi credentials are read from `image/config.local.env`, which is excluded
-from Git. See `image/config.example.env`.
-
-## Security
-
-The generated image contains the Wi-Fi password. Keep the image private. Do
-not commit `image/config.local.env` or a generated image to Git.
+Wi-Fi credentials are read from the ignored `image/config.local.env`; see
+`image/config.example.env`. The generated image contains the Wi-Fi password, so
+keep it private and never commit the local environment file or generated image.
