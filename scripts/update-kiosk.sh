@@ -6,6 +6,12 @@ BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 
 cd "$APP_DIR"
 
+# This idempotent root setup also runs when no source update is needed, allowing
+# an older image to receive new system helpers on the next timer pass.
+if [ -x "$APP_DIR/scripts/apply-system-config.sh" ]; then
+  "$APP_DIR/scripts/apply-system-config.sh"
+fi
+
 if ! git remote get-url origin >/dev/null 2>&1; then
   echo "No Git origin configured; leaving installed payload unchanged"
   exit 0
@@ -30,5 +36,11 @@ git merge-base --is-ancestor "$current" "$target" || {
 }
 
 git merge --ff-only "$target"
+if [ -x "$APP_DIR/scripts/apply-system-config.sh" ]; then
+  "$APP_DIR/scripts/apply-system-config.sh"
+fi
 systemctl restart tv-kiosk-web.service
-systemctl try-restart tv-kiosk-browser.service || true
+KIOSK_UID=$(id -u kiosk)
+if [ -S "/run/user/$KIOSK_UID/bus" ]; then
+  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user try-restart tv-kiosk-browser.service || true
+fi

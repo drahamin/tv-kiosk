@@ -2,4 +2,4 @@ xset s off
 xset s noblank
 xset -dpms
 unclutter -idle 1 -root &
-/opt/tv-kiosk/scripts/launch-browser.sh &
+systemctl --user restart tv-kiosk-browser.service &

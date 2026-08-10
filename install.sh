@@ -38,7 +38,7 @@ if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
 fi
 
 chown -R root:root "$APP_DIR"
-chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py"
+chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action"
 
 mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/tv-kiosk"
 cat > /etc/tv-kiosk/kiosk.env <<EOF
@@ -64,6 +64,8 @@ chown -R "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER"
 chmod +x "/home/$KIOSK_USER/.config/openbox/autostart"
 chmod +x "/home/$KIOSK_USER/.config/labwc/autostart"
 
+"$APP_DIR/scripts/apply-system-config.sh"
+
 install -m 0644 "$APP_DIR/systemd/tv-kiosk-web.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/systemd/tv-kiosk-update.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/systemd/tv-kiosk-update.timer" /etc/systemd/system/
@@ -72,4 +74,4 @@ systemctl daemon-reload
 systemctl enable avahi-daemon.service ssh.service tv-kiosk-web.service tv-kiosk-update.timer lightdm.service
 systemctl set-default graphical.target
 
-echo "TV kiosk installed. Reboot to start the full-screen display."
+echo "Rahamin Kiosk installed. Reboot to start the full-screen display."

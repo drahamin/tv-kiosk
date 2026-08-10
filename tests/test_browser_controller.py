@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -10,6 +12,18 @@ spec.loader.exec_module(controller)
 
 
 class BrowserControllerTests(unittest.TestCase):
+    def test_load_config_filters_disabled_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "kiosk.json"
+            path.write_text(json.dumps({"rotation_seconds": 25, "pages": [
+                {"name": "One", "url": "http://one.test", "enabled": True},
+                {"name": "Two", "url": "http://two.test", "enabled": False},
+                {"name": "Three", "url": "http://three.test", "enabled": True},
+            ]}), encoding="utf-8")
+            with patch.object(controller, "CONFIG_PATH", path):
+                config = controller.load_config()
+        self.assertEqual([page["name"] for page in config["pages"]], ["One", "Three"])
+
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = b"Target activated"

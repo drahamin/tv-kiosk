@@ -36,7 +36,7 @@ trap failed EXIT
 setfont /usr/share/consolefonts/Lat15-TerminusBold32x16.psf.gz 2>/dev/null || true
 printf '\033[2J\033[H'
 printf '\033[1;44;37m                                                    \033[0m\n'
-printf '\033[1;44;37m          RAHAMIN SAMSUNG TV KIOSK SETUP           \033[0m\n'
+printf '\033[1;44;37m              RAHAMIN KIOSK SETUP                  \033[0m\n'
 printf '\033[1;44;37m                                                    \033[0m\n'
 printf '\nKeep this Raspberry Pi powered on. No input is required.\n'
 printf 'Initial setup normally takes 10 to 25 minutes.\n'
@@ -83,11 +83,11 @@ progress 5 'Installing the browser and full-screen display'
 printf 'The display software is being checked and configured.\n'
 "$INSTALLER" >> "$LOG_FILE" 2>&1
 
-progress 6 'Setup complete — starting the TV kiosk'
+progress 6 'Setup complete — starting Rahamin Kiosk'
 systemctl disable tv-kiosk-firstboot.service >> "$LOG_FILE" 2>&1
 sync
 printf '\nThe Raspberry Pi will reboot in 5 seconds.\n'
-printf 'After reboot, the three TV pages will start automatically.\n'
+printf 'After reboot, the TV will show its DHCP address and configuration instructions.\n'
 if [ -n "${NETWORK_ADDRESS:-}" ]; then
   printf 'Maintenance address: kiosk@%s\n' "$NETWORK_ADDRESS"
 fi
