@@ -24,14 +24,14 @@
       "enabled": true
     },
     {
-      "name": "Page 4",
-      "url": "",
-      "enabled": false
+      "name": "Miami Weather",
+      "url": "http://192.168.86.196:8999/miami",
+      "enabled": true
     },
     {
-      "name": "Page 5",
-      "url": "",
-      "enabled": false
+      "name": "Sicily Weather",
+      "url": "http://192.168.86.196:8999/sicily",
+      "enabled": true
     }
   ]
 }

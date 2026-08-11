@@ -9,6 +9,13 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "app" / "server.py"
 
 
 class KioskServerTests(unittest.TestCase):
+    def test_default_playlist_contains_both_weather_pages(self):
+        default = json.loads((MODULE_PATH.parents[1] / "config" / "kiosk.json").read_text(encoding="utf-8"))
+        weather = {page["name"]: page for page in default["pages"][3:]}
+        self.assertEqual(weather["Miami Weather"]["url"], "http://192.168.86.196:8999/miami")
+        self.assertEqual(weather["Sicily Weather"]["url"], "http://192.168.86.196:8999/sicily")
+        self.assertTrue(all(page["enabled"] for page in weather.values()))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         config = {
