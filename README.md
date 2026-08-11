@@ -7,6 +7,8 @@ interval. The default playlist rotates every 25 seconds:
 1. Rahamin ADS-B TV
 2. Rahamin AIS TV (Miami)
 3. Airport / Samsung TV board
+4. Miami Weather
+5. Sicily Weather
 
 The local service listens on port `8999` by default and provides:
 
