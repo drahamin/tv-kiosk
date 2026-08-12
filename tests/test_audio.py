@@ -49,8 +49,11 @@ class HdmiAudioTests(unittest.TestCase):
     def test_audio_service_plays_twinkle_once(self):
         unit = (ROOT / "systemd" / "tv-kiosk-chime.service").read_text(encoding="utf-8")
         self.assertIn("WantedBy=default.target", unit)
-        self.assertIn("startup-chime.py", unit)
-        self.assertIn("--volume=0.25", unit)
+        self.assertIn("rahamin-kiosk-chime", unit)
+        helper = (ROOT / "scripts" / "rahamin-kiosk-chime").read_text(encoding="utf-8")
+        self.assertIn("startup-chime.py", helper)
+        self.assertIn("--volume=0.25", helper)
+        self.assertIn('attempt" -le 3', helper)
 
     def test_successful_updates_replay_twinkle(self):
         updater = (ROOT / "scripts" / "update-kiosk.sh").read_text(encoding="utf-8")

@@ -41,7 +41,7 @@ if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
 fi
 
 chown -R root:root "$APP_DIR"
-chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio"
+chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio" "$APP_DIR/scripts/rahamin-kiosk-chime"
 
 mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/tv-kiosk"
 cat > /etc/tv-kiosk/kiosk.env <<EOF
