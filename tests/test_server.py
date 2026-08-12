@@ -23,6 +23,7 @@ class KioskServerTests(unittest.TestCase):
             "listen_port": 8999,
             "rotation_seconds": 25,
             "transition_seconds": 0.7,
+            "zoom_percent": 100,
             "show_status": True,
             "background": "#080706",
             "theme": "rahamin",
@@ -83,6 +84,8 @@ class KioskServerTests(unittest.TestCase):
         body = self.module.admin_page(self.config, {"username": "admin", "csrf": csrf})
         self.assertIn("Rahamin Kiosk", body)
         self.assertIn("Rotation time", body)
+        self.assertIn("Page zoom", body)
+        self.assertIn("Samsung remote (Anynet+)", body)
         self.assertIn("Web port", body)
         self.assertIn("Up to five full-screen pages", body)
         self.assertIn("NETWORK CONFIGURATION", body)
@@ -113,6 +116,11 @@ class KioskServerTests(unittest.TestCase):
         broken = {**self.config, "pages": [{**page, "enabled": False} for page in self.config["pages"]]}
         with self.assertRaises(ValueError):
             self.module.validate_config(broken)
+
+    def test_accepts_only_supported_zoom_levels(self):
+        self.assertEqual(self.module.validate_config({**self.config, "zoom_percent": 125})["zoom_percent"], 125)
+        with self.assertRaises(ValueError):
+            self.module.validate_config({**self.config, "zoom_percent": 123})
 
     def test_validates_full_network_request(self):
         form = {

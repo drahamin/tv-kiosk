@@ -1,0 +1,15 @@
+[Unit]
+Description=Rahamin Kiosk Samsung HDMI-CEC remote control
+After=graphical-session.target tv-kiosk-browser.service
+
+[Service]
+Type=simple
+Environment=XDG_RUNTIME_DIR=%t
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStartPre=/bin/sh -c 'while [ ! -S "%t/wayland-0" ]; do sleep 1; done'
+ExecStart=/opt/tv-kiosk/scripts/rahamin-kiosk-remote
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

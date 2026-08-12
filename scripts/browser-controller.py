@@ -31,12 +31,13 @@ def load_config():
         config = json.load(handle)
     if not config.get("setup_complete", True):
         port = int(config.get("listen_port", 8999))
-        return {"rotation_seconds": 3600, "pages": [{"name": "Configure Rahamin Kiosk", "url": f"http://127.0.0.1:{port}/setup"}]}
+        return {"rotation_seconds": 3600, "zoom_percent": int(config.get("zoom_percent", 100)), "pages": [{"name": "Configure Rahamin Kiosk", "url": f"http://127.0.0.1:{port}/setup"}]}
     pages = [page for page in config.get("pages", []) if page.get("enabled", True) and page.get("url")]
     if not 1 <= len(pages) <= 5:
         raise ValueError("Rahamin Kiosk requires one to five enabled pages")
     return {
         "rotation_seconds": max(5, int(config.get("rotation_seconds", 25))),
+        "zoom_percent": int(config.get("zoom_percent", 100)),
         "pages": [{"name": str(page["name"]), "url": str(page["url"])} for page in pages],
     }
 
@@ -92,7 +93,7 @@ def replace_tab(url, old_id=None):
     return new_id
 
 
-def launch_chromium():
+def launch_chromium(zoom_percent=100):
     profile = STATE_DIR / "chromium-profile"
     cache = STATE_DIR / "chromium-cache"
     profile.mkdir(parents=True, exist_ok=True)
@@ -107,6 +108,7 @@ def launch_chromium():
         f"--remote-debugging-port={DEBUG_PORT}",
         "--kiosk",
         "--start-fullscreen",
+        f"--force-device-scale-factor={zoom_percent / 100:g}",
         "--noerrdialogs",
         "--disable-infobars",
         "--disable-session-crashed-bubble",
@@ -121,7 +123,8 @@ def launch_chromium():
 
 def supervise():
     while running:
-        process = launch_chromium()
+        launch_config = load_config()
+        process = launch_chromium(launch_config["zoom_percent"])
         tab_id = None
         try:
             wait_for_chromium(process)
@@ -130,6 +133,9 @@ def supervise():
             next_rotation = 0
             while running and process.poll() is None:
                 config = load_config()
+                if config["zoom_percent"] != launch_config["zoom_percent"]:
+                    print("Page zoom changed; restarting Chromium", flush=True)
+                    break
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
                     tab_id = replace_tab(config["pages"][0]["url"], tab_id)

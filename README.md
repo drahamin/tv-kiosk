@@ -34,6 +34,7 @@ The control center supports:
 
 - up to five saved pages, individual enable/disable controls, and connection tests;
 - rotation timing, transition timing, display colors, themes, title, and web port;
+- fixed page zoom choices from 50% to 200%;
 - Raspberry Pi temperature, load, memory, disk, uptime, software revision, and
   service status;
 - Wi-Fi, Ethernet, DHCP or static IPv4, IPv6, DNS, gateway, hostname, Wi-Fi
@@ -44,6 +45,20 @@ The control center supports:
 Static address fields remain blank while DHCP is selected. Network changes can
 move the admin page to a new address. Saved Wi-Fi passwords are never displayed.
 Passwords are stored as salted PBKDF2 hashes and sessions use HTTP-only cookies.
+
+## Samsung remote
+
+The kiosk listens for the Samsung television remote through Anynet+ (HDMI-CEC),
+with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
+
+- arrows and OK to navigate the active web page;
+- Play/Pause to control page media;
+- Channel Up and Channel Down to zoom in and out;
+- 0 to reset browser zoom to 100%.
+
+The Admin page also provides persistent zoom choices from 50% through 200%.
+That saved zoom applies at every boot; temporary remote zoom remains available
+while the kiosk is running.
 
 Runtime state is stored outside the Git checkout under
 `/home/kiosk/.config/tv-kiosk`, so automatic updates do not overwrite it.
@@ -57,7 +72,8 @@ sudo ./install.sh
 ```
 
 The installer configures graphical autologin, prevents login and keyring prompts,
-starts Chromium in kiosk mode, installs the web control center, enables GitHub
+starts Chromium in kiosk mode, installs the web control center and Samsung
+HDMI-CEC remote service, enables GitHub
 updates, and installs supervised browser recovery. It also disables unused
 Bluetooth and NFS/RPC services and safely trims old package archives, logs, and
 crash reports without removing required Raspberry Pi components.
