@@ -20,6 +20,15 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--kiosk", command)
         self.assertIn("--start-fullscreen", command)
         self.assertIn("--force-device-scale-factor=1.25", command)
+        self.assertIn("--autoplay-policy=no-user-gesture-required", command)
+        self.assertTrue(command[-1].endswith("/session/boot.html"))
+        self.assertNotIn("--mute-audio", command)
+
+    def test_chromium_can_disable_audio_without_extra_processes(self):
+        fake = MagicMock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+            controller.launch_chromium(100, False)
+        self.assertIn("--mute-audio", popen.call_args.args[0])
 
     def test_load_config_filters_disabled_pages(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -33,6 +42,8 @@ class BrowserControllerTests(unittest.TestCase):
                 config = controller.load_config()
         self.assertEqual([page["name"] for page in config["pages"]], ["One", "Three"])
         self.assertEqual(config["zoom_percent"], 100)
+        self.assertTrue(config["audio_enabled"])
+        self.assertEqual(config["audio_volume"], 60)
 
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()

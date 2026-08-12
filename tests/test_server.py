@@ -24,6 +24,8 @@ class KioskServerTests(unittest.TestCase):
             "rotation_seconds": 25,
             "transition_seconds": 0.7,
             "zoom_percent": 100,
+            "audio_enabled": True,
+            "audio_volume": 60,
             "show_status": True,
             "background": "#080706",
             "theme": "rahamin",
@@ -85,6 +87,8 @@ class KioskServerTests(unittest.TestCase):
         self.assertIn("Rahamin Kiosk", body)
         self.assertIn("Rotation time", body)
         self.assertIn("Page zoom", body)
+        self.assertIn("HDMI audio volume", body)
+        self.assertIn("Enable audio through the TV", body)
         self.assertIn("Samsung remote (Anynet+)", body)
         self.assertIn("Web port", body)
         self.assertIn("Up to five full-screen pages", body)
@@ -121,6 +125,13 @@ class KioskServerTests(unittest.TestCase):
         self.assertEqual(self.module.validate_config({**self.config, "zoom_percent": 125})["zoom_percent"], 125)
         with self.assertRaises(ValueError):
             self.module.validate_config({**self.config, "zoom_percent": 123})
+
+    def test_validates_hdmi_audio_settings(self):
+        configured = self.module.validate_config({**self.config, "audio_enabled": False, "audio_volume": 75})
+        self.assertFalse(configured["audio_enabled"])
+        self.assertEqual(configured["audio_volume"], 75)
+        with self.assertRaises(ValueError):
+            self.module.validate_config({**self.config, "audio_volume": 101})
 
     def test_validates_full_network_request(self):
         form = {

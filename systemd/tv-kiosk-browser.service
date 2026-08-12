@@ -1,6 +1,7 @@
 [Unit]
 Description=Rahamin Kiosk full-screen browser controller
-After=graphical-session.target
+After=graphical-session.target tv-kiosk-audio.service
+Wants=tv-kiosk-audio.service
 
 [Service]
 Type=simple

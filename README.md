@@ -35,6 +35,7 @@ The control center supports:
 - up to five saved pages, individual enable/disable controls, and connection tests;
 - rotation timing, transition timing, display colors, themes, title, and web port;
 - fixed page zoom choices from 50% to 200%;
+- automatic HDMI audio detection, enable/disable control, and a 0–100 TV volume setting;
 - Raspberry Pi temperature, load, memory, disk, uptime, software revision, and
   service status;
 - Wi-Fi, Ethernet, DHCP or static IPv4, IPv6, DNS, gateway, hostname, Wi-Fi
@@ -45,6 +46,20 @@ The control center supports:
 Static address fields remain blank while DHCP is selected. Network changes can
 move the admin page to a new address. Saved Wi-Fi passwords are never displayed.
 Passwords are stored as salted PBKDF2 hashes and sessions use HTTP-only cookies.
+
+HDMI audio automatically follows the available Pi 3 or Pi 4 HDMI sink. It uses
+the PipeWire and WirePlumber session already provided by Raspberry Pi OS, applies
+settings only at startup or when Admin changes, and adds no polling audio daemon,
+software transcoder, or idle CPU workload. Chromium is permitted to play page
+audio without waiting for a mouse or keyboard gesture.
+After HDMI is selected, a gentle sub-second three-note twinkle confirms that the
+TV audio path is working. The same twinkle plays after a real GitHub update, but
+not after routine checks that find nothing new. It leaves no player or audio
+task running afterward.
+
+During each normal boot, a full-screen Rahamin Kiosk startup page replaces the
+desktop and reports display, HDMI audio, network, and page-loading stages. The
+unneeded desktop shell and panel are stopped, saving roughly 40 MB of memory.
 
 ## Samsung remote
 

@@ -1,3 +1,4 @@
+xsetroot -solid '#071219'
 xset s off
 xset s noblank
 xset -dpms
