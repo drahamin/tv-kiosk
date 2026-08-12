@@ -27,6 +27,10 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn('action name="WarpCursor"', config)
         self.assertIn("wtype -M alt -M logo", autostart)
 
+    def test_successful_updates_restart_remote_listener(self):
+        updater = (ROOT / "scripts" / "update-kiosk.sh").read_text(encoding="utf-8")
+        self.assertIn("try-restart tv-kiosk-remote.service", updater)
+
 
 if __name__ == "__main__":
     unittest.main()
