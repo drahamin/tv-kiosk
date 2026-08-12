@@ -12,6 +12,14 @@ spec.loader.exec_module(controller)
 
 
 class BrowserControllerTests(unittest.TestCase):
+    def test_chromium_launch_forces_fullscreen(self):
+        fake = MagicMock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+            self.assertIs(controller.launch_chromium(), fake)
+        command = popen.call_args.args[0]
+        self.assertIn("--kiosk", command)
+        self.assertIn("--start-fullscreen", command)
+
     def test_load_config_filters_disabled_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "kiosk.json"

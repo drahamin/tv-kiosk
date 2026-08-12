@@ -60,6 +60,7 @@ EOF
 
 cp "$APP_DIR/session/openbox-autostart" "/home/$KIOSK_USER/.config/openbox/autostart"
 cp "$APP_DIR/session/labwc-autostart" "/home/$KIOSK_USER/.config/labwc/autostart"
+cp "$APP_DIR/session/labwc-rc.xml" "/home/$KIOSK_USER/.config/labwc/rc.xml"
 if [ ! -e "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" ]; then
   cp "$APP_DIR/config/kiosk.json" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
 fi
