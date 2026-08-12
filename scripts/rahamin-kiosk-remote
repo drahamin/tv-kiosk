@@ -29,9 +29,11 @@ handle_cec_line() {
 
 echo "Rahamin Kiosk Samsung remote listener starting"
 while :; do
-  cec-client -d 1 -o "Rahamin Kiosk" 2>&1 | while IFS= read -r line; do
+  # Register as a playback device and active source so Samsung Anynet+ sends
+  # remote presses to the Pi. Debug events are required for "key pressed".
+  printf 'as\n' | cec-client -t p -d 31 -o "Rahamin Kiosk" 2>&1 | while IFS= read -r line; do
     case "$line" in
-      *"key pressed:"*) handle_cec_line "$line" ;;
+      *"key pressed:"*) echo "$line"; handle_cec_line "$line" ;;
     esac
   done
   echo "HDMI-CEC listener stopped; retrying in 3 seconds" >&2

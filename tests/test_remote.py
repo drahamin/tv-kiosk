@@ -12,11 +12,20 @@ class RemoteControlTests(unittest.TestCase):
             self.assertIn(command, script)
         self.assertIn('send_control_key plus', script)
         self.assertIn('send_control_key minus', script)
+        self.assertIn("cec-client -t p -d 31", script)
+        self.assertIn("printf 'as\\n'", script)
 
     def test_remote_service_waits_for_wayland(self):
         unit = (ROOT / "systemd" / "tv-kiosk-remote.service").read_text(encoding="utf-8")
         self.assertIn("wayland-0", unit)
         self.assertIn("Restart=always", unit)
+
+    def test_labwc_hides_and_warps_cursor(self):
+        config = (ROOT / "session" / "labwc-rc.xml").read_text(encoding="utf-8")
+        autostart = (ROOT / "session" / "labwc-autostart").read_text(encoding="utf-8")
+        self.assertIn('action name="HideCursor"', config)
+        self.assertIn('action name="WarpCursor"', config)
+        self.assertIn("wtype -M alt -M logo", autostart)
 
 
 if __name__ == "__main__":

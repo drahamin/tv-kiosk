@@ -3,3 +3,4 @@ pkill -f '/usr/bin/lwrespawn /usr/bin/wf-panel-pi' 2>/dev/null || true
 pkill -x pcmanfm 2>/dev/null || true
 pkill -x wf-panel-pi 2>/dev/null || true
 systemctl --user restart tv-kiosk-browser.service &
+(sleep 3; wtype -M alt -M logo -P h -p h -m logo -m alt) &
