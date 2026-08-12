@@ -12,6 +12,10 @@ class RemoteControlTests(unittest.TestCase):
             self.assertIn(command, script)
         self.assertIn('send_control_key plus', script)
         self.assertIn('send_control_key minus', script)
+        self.assertIn('key pressed: fast forward', script)
+        self.assertIn('key pressed: rewind', script)
+        self.assertIn('key pressed: stop', script)
+        self.assertIn('", 0)"', script)
         self.assertIn("cec-client -t p -d 31", script)
         self.assertIn("printf 'as\\n'", script)
 
