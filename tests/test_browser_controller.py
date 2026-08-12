@@ -14,11 +14,14 @@ spec.loader.exec_module(controller)
 class BrowserControllerTests(unittest.TestCase):
     def test_chromium_launch_forces_fullscreen(self):
         fake = MagicMock()
-        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
             self.assertIs(controller.launch_chromium(125), fake)
         command = popen.call_args.args[0]
         self.assertIn("--kiosk", command)
         self.assertIn("--start-fullscreen", command)
+        self.assertIn("--start-maximized", command)
+        self.assertIn("--window-position=0,0", command)
+        self.assertIn("--window-size=1920,1080", command)
         self.assertIn("--force-device-scale-factor=1.25", command)
         self.assertIn("--autoplay-policy=no-user-gesture-required", command)
         self.assertIn("--disk-cache-size=268435456", command)
@@ -29,7 +32,7 @@ class BrowserControllerTests(unittest.TestCase):
 
     def test_chromium_can_disable_audio_without_extra_processes(self):
         fake = MagicMock()
-        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
             controller.launch_chromium(100, False)
         self.assertIn("--mute-audio", popen.call_args.args[0])
 
@@ -47,6 +50,11 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertEqual(config["zoom_percent"], 100)
         self.assertTrue(config["audio_enabled"])
         self.assertEqual(config["audio_volume"], 60)
+
+    def test_display_size_uses_current_hdmi_mode(self):
+        result = MagicMock(stdout="HDMI-A-1\n  3840x2160 px, 60.000000 Hz (current)\n")
+        with patch.object(controller.subprocess, "run", return_value=result):
+            self.assertEqual(controller.display_size(), (3840, 2160))
 
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()
