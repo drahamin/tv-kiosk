@@ -90,6 +90,7 @@ class KioskServerTests(unittest.TestCase):
         self.assertIn("HDMI audio volume", body)
         self.assertIn("Enable audio through the TV", body)
         self.assertIn("Samsung remote (Anynet+)", body)
+        self.assertIn("Fast-forward/Rewind zoom in/out", body)
         self.assertIn("Web port", body)
         self.assertIn("Up to five full-screen pages", body)
         self.assertIn("NETWORK CONFIGURATION", body)

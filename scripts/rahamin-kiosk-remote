@@ -21,6 +21,9 @@ handle_cec_line() {
     *"key pressed: page up "*) send_key Page_Up ;;
     *"key pressed: page down "*) send_key Page_Down ;;
     *"key pressed: play "*|*"key pressed: pause "*|*"key pressed: play/pause "*) send_key space ;;
+    *"key pressed: fast forward "*|*"key pressed: forward "*) send_control_key plus ;;
+    *"key pressed: rewind "*|*"key pressed: backward "*) send_control_key minus ;;
+    *"key pressed: stop "*) send_control_key 0 ;;
     *"key pressed: channel up "*) send_control_key plus ;;
     *"key pressed: channel down "*) send_control_key minus ;;
     *"key pressed: number0 "*|*"key pressed: 0 "*) send_control_key 0 ;;
@@ -33,7 +36,9 @@ while :; do
   # remote presses to the Pi. Debug events are required for "key pressed".
   printf 'as\n' | cec-client -t p -d 31 -o "Rahamin Kiosk" 2>&1 | while IFS= read -r line; do
     case "$line" in
-      *"key pressed:"*) echo "$line"; handle_cec_line "$line" ;;
+      # libCEC reports a detailed state line and a canonical event line for
+      # every press. Handle only the latter so one remote press means one key.
+      *"key pressed:"*", 0)"*) echo "$line"; handle_cec_line "$line" ;;
     esac
   done
   echo "HDMI-CEC listener stopped; retrying in 3 seconds" >&2

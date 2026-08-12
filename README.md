@@ -68,10 +68,12 @@ with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
 
 - arrows and OK to navigate the active web page;
 - Play/Pause to control page media;
-- Channel Up and Channel Down to zoom in and out;
-- 0 to reset browser zoom to 100%.
+- Fast-forward and Rewind to zoom in and out;
+- Stop to reset browser zoom to 100%.
 
-The CEC listener registers Rahamin Kiosk as the active HDMI playback source so
+Samsung keeps the Channel rocker for television functions and may show an
+unsupported-mode message when it is pressed on an HDMI input. The CEC listener
+registers Rahamin Kiosk as the active HDMI playback source so
 Samsung Anynet+ forwards key presses to it. The Wayland compositor hides and
 parks the pointer after startup; no mouse or X11 cursor utility is required.
 
