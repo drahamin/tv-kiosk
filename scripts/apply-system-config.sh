@@ -20,6 +20,11 @@ if [ ! -e "$STATE_DIR/home-ownership-v1" ]; then
   touch "$STATE_DIR/home-ownership-v1"
 fi
 
+install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/openbox"
+install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/labwc-autostart" "/home/$KIOSK_USER/.config/labwc/autostart"
+install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/labwc-rc.xml" "/home/$KIOSK_USER/.config/labwc/rc.xml"
+install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/openbox-autostart" "/home/$KIOSK_USER/.config/openbox/autostart"
+
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-network" /usr/local/sbin/rahamin-kiosk-network
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cleanup" /usr/local/sbin/rahamin-kiosk-cleanup
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action" /usr/local/sbin/rahamin-kiosk-action
@@ -46,6 +51,10 @@ fi
 # Commit helpers, sudo rules, and the browser unit to storage before any browser
 # load is started. This protects the installation if an undervoltage reset occurs.
 sync
+
+if pgrep -x labwc >/dev/null 2>&1; then
+  pkill -HUP -x labwc || true
+fi
 
 if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user daemon-reload || true

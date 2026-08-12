@@ -106,6 +106,7 @@ def launch_chromium():
         "--remote-debugging-address=127.0.0.1",
         f"--remote-debugging-port={DEBUG_PORT}",
         "--kiosk",
+        "--start-fullscreen",
         "--noerrdialogs",
         "--disable-infobars",
         "--disable-session-crashed-bubble",
