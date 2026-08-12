@@ -6,6 +6,7 @@ import os
 import signal
 import subprocess
 import time
+import re
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import quote
@@ -105,11 +106,23 @@ def configure_audio(config):
     )
 
 
+def display_size():
+    try:
+        result = subprocess.run(["wlr-randr"], capture_output=True, text=True, timeout=3, check=False)
+        match = re.search(r"(\d+)x(\d+) px, [^\n]+\(current\)", result.stdout)
+        if match:
+            return int(match.group(1)), int(match.group(2))
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return 1920, 1080
+
+
 def launch_chromium(zoom_percent=100, audio_enabled=True):
     profile = STATE_DIR / "chromium-profile"
     cache = STATE_DIR / "chromium-cache"
     profile.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
+    width, height = display_size()
     command = [
         CHROMIUM,
         "--ozone-platform=wayland",
@@ -120,6 +133,9 @@ def launch_chromium(zoom_percent=100, audio_enabled=True):
         f"--remote-debugging-port={DEBUG_PORT}",
         "--kiosk",
         "--start-fullscreen",
+        "--start-maximized",
+        "--window-position=0,0",
+        f"--window-size={width},{height}",
         f"--force-device-scale-factor={zoom_percent / 100:g}",
         "--autoplay-policy=no-user-gesture-required",
         "--noerrdialogs",

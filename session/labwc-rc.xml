@@ -6,9 +6,4 @@
       <action name="WarpCursor" x="-1" y="-1" />
     </keybind>
   </keyboard>
-  <windowRules>
-    <windowRule identifier="*chromium*">
-      <action name="ToggleFullscreen" />
-    </windowRule>
-  </windowRules>
 </labwc_config>
