@@ -21,6 +21,9 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--start-fullscreen", command)
         self.assertIn("--force-device-scale-factor=1.25", command)
         self.assertIn("--autoplay-policy=no-user-gesture-required", command)
+        self.assertIn("--disk-cache-size=268435456", command)
+        self.assertIn("--renderer-process-limit=3", command)
+        self.assertNotIn("--incognito", command)
         self.assertTrue(command[-1].endswith("/session/boot.html"))
         self.assertNotIn("--mute-audio", command)
 

@@ -71,6 +71,10 @@ with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
 - Channel Up and Channel Down to zoom in and out;
 - 0 to reset browser zoom to 100%.
 
+The CEC listener registers Rahamin Kiosk as the active HDMI playback source so
+Samsung Anynet+ forwards key presses to it. The Wayland compositor hides and
+parks the pointer after startup; no mouse or X11 cursor utility is required.
+
 The Admin page also provides persistent zoom choices from 50% through 200%.
 That saved zoom applies at every boot; temporary remote zoom remains available
 while the kiosk is running.
@@ -101,6 +105,12 @@ Chromium is loading map pages.
 The attached TV rotates full Chromium tabs instead of embedding remote pages.
 This avoids remote `X-Frame-Options` restrictions and keeps memory use reasonable
 on both supported models.
+
+The display uses the highest mode exposed by the attached TV and Pi. On the Pi 3
+this is normally native 1920×1080 at 60 Hz. Chromium keeps a bounded 256 MB disk
+cache for map tiles and page assets, limits renderer processes, and disables
+unneeded background services so repeat page loads are faster without retaining
+all five heavy map pages in memory.
 
 ## GitHub updates
 
