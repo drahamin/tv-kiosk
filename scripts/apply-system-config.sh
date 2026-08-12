@@ -11,6 +11,11 @@ KIOSK_USER=${KIOSK_USER:-kiosk}
 KIOSK_UID=$(id -u "$KIOSK_USER")
 STATE_DIR=/var/lib/rahamin-kiosk
 
+if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1; then
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils wtype
+fi
+
 # Early images could leave the dedicated home owned by root, which prevents
 # pcmanfm, Chromium, and WirePlumber from creating normal session state.
 if [ ! -e "$STATE_DIR/home-ownership-v1" ]; then
@@ -40,6 +45,12 @@ if ! cmp -s "$APP_DIR/systemd/tv-kiosk-browser.service" "$BROWSER_UNIT"; then
   install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-browser.service" "$BROWSER_UNIT"
   BROWSER_CHANGED=true
 fi
+REMOTE_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-remote.service"
+REMOTE_CHANGED=false
+if ! cmp -s "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"; then
+  install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"
+  REMOTE_CHANGED=true
+fi
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user/default.target.wants"
 DISPLAY_DISABLED="/home/$KIOSK_USER/.config/tv-kiosk/display-disabled"
 if [ -e "$DISPLAY_DISABLED" ]; then
@@ -47,6 +58,7 @@ if [ -e "$DISPLAY_DISABLED" ]; then
 else
   ln -sf ../tv-kiosk-browser.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-browser.service"
 fi
+ln -sf ../tv-kiosk-remote.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-remote.service"
 
 # Commit helpers, sudo rules, and the browser unit to storage before any browser
 # load is started. This protects the installation if an undervoltage reset occurs.
@@ -70,6 +82,10 @@ if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   fi
   if [ "$BROWSER_CHANGED" = true ] && [ ! -e "$DISPLAY_DISABLED" ]; then
     runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-browser.service || true
+  fi
+  runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-remote.service || true
+  if [ "$REMOTE_CHANGED" = true ] || ! pgrep -u "$KIOSK_USER" -f "$APP_DIR/scripts/rahamin-kiosk-remote" >/dev/null 2>&1; then
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-remote.service || true
   fi
 fi
 

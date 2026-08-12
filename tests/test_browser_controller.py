@@ -15,10 +15,11 @@ class BrowserControllerTests(unittest.TestCase):
     def test_chromium_launch_forces_fullscreen(self):
         fake = MagicMock()
         with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
-            self.assertIs(controller.launch_chromium(), fake)
+            self.assertIs(controller.launch_chromium(125), fake)
         command = popen.call_args.args[0]
         self.assertIn("--kiosk", command)
         self.assertIn("--start-fullscreen", command)
+        self.assertIn("--force-device-scale-factor=1.25", command)
 
     def test_load_config_filters_disabled_pages(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -31,6 +32,7 @@ class BrowserControllerTests(unittest.TestCase):
             with patch.object(controller, "CONFIG_PATH", path):
                 config = controller.load_config()
         self.assertEqual([page["name"] for page in config["pages"]], ["One", "Three"])
+        self.assertEqual(config["zoom_percent"], 100)
 
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()

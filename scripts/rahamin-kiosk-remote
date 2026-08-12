@@ -1,0 +1,39 @@
+#!/bin/sh
+# Translate Samsung Anynet+ (HDMI-CEC) remote presses into Wayland keys.
+set -u
+
+send_key() {
+  wtype -P "$1" -p "$1"
+}
+
+send_control_key() {
+  wtype -M ctrl -P "$1" -p "$1" -m ctrl
+}
+
+handle_cec_line() {
+  line=$1
+  case "$line" in
+    *"key pressed: up "*) send_key up ;;
+    *"key pressed: down "*) send_key down ;;
+    *"key pressed: left "*) send_key left ;;
+    *"key pressed: right "*) send_key right ;;
+    *"key pressed: select "*) send_key Return ;;
+    *"key pressed: page up "*) send_key Page_Up ;;
+    *"key pressed: page down "*) send_key Page_Down ;;
+    *"key pressed: play "*|*"key pressed: pause "*|*"key pressed: play/pause "*) send_key space ;;
+    *"key pressed: channel up "*) send_control_key plus ;;
+    *"key pressed: channel down "*) send_control_key minus ;;
+    *"key pressed: number0 "*|*"key pressed: 0 "*) send_control_key 0 ;;
+  esac
+}
+
+echo "Rahamin Kiosk Samsung remote listener starting"
+while :; do
+  cec-client -d 1 -o "Rahamin Kiosk" 2>&1 | while IFS= read -r line; do
+    case "$line" in
+      *"key pressed:"*) handle_cec_line "$line" ;;
+    esac
+  done
+  echo "HDMI-CEC listener stopped; retrying in 3 seconds" >&2
+  sleep 3
+done
