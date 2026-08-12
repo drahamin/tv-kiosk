@@ -19,7 +19,7 @@ if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
   apt-get update
 fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  avahi-daemon cec-utils chromium git lightdm network-manager openbox openssh-server python3 unclutter wtype x11-xserver-utils xserver-xorg
+  avahi-daemon cec-utils chromium git lightdm network-manager openbox openssh-server pipewire pipewire-pulse python3 unclutter wireplumber wtype x11-xserver-utils xserver-xorg
 
 if ! id "$KIOSK_USER" >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash "$KIOSK_USER"
@@ -41,7 +41,7 @@ if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
 fi
 
 chown -R root:root "$APP_DIR"
-chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote"
+chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio"
 
 mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/tv-kiosk"
 cat > /etc/tv-kiosk/kiosk.env <<EOF

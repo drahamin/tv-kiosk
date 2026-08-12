@@ -4,6 +4,8 @@
   "rotation_seconds": 25,
   "transition_seconds": 0.7,
   "zoom_percent": 100,
+  "audio_enabled": true,
+  "audio_volume": 60,
   "show_status": true,
   "background": "#080706",
   "theme": "rahamin",

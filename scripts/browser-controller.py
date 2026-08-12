@@ -18,6 +18,7 @@ DEFAULT_CONFIG = ROOT / "config" / "kiosk.json"
 DEBUG_PORT = int(os.environ.get("KIOSK_DEBUG_PORT", "9222"))
 CHROMIUM = os.environ.get("KIOSK_CHROMIUM", "chromium")
 running = True
+BOOT_MIN_SECONDS = 4
 
 
 def stop(_signum, _frame):
@@ -31,13 +32,15 @@ def load_config():
         config = json.load(handle)
     if not config.get("setup_complete", True):
         port = int(config.get("listen_port", 8999))
-        return {"rotation_seconds": 3600, "zoom_percent": int(config.get("zoom_percent", 100)), "pages": [{"name": "Configure Rahamin Kiosk", "url": f"http://127.0.0.1:{port}/setup"}]}
+        return {"rotation_seconds": 3600, "zoom_percent": int(config.get("zoom_percent", 100)), "audio_enabled": bool(config.get("audio_enabled", True)), "audio_volume": int(config.get("audio_volume", 60)), "pages": [{"name": "Configure Rahamin Kiosk", "url": f"http://127.0.0.1:{port}/setup"}]}
     pages = [page for page in config.get("pages", []) if page.get("enabled", True) and page.get("url")]
     if not 1 <= len(pages) <= 5:
         raise ValueError("Rahamin Kiosk requires one to five enabled pages")
     return {
         "rotation_seconds": max(5, int(config.get("rotation_seconds", 25))),
         "zoom_percent": int(config.get("zoom_percent", 100)),
+        "audio_enabled": bool(config.get("audio_enabled", True)),
+        "audio_volume": int(config.get("audio_volume", 60)),
         "pages": [{"name": str(page["name"]), "url": str(page["url"])} for page in pages],
     }
 
@@ -93,7 +96,16 @@ def replace_tab(url, old_id=None):
     return new_id
 
 
-def launch_chromium(zoom_percent=100):
+def configure_audio(config):
+    helper = ROOT / "scripts" / "rahamin-kiosk-audio"
+    subprocess.run(
+        [str(helper), "on" if config["audio_enabled"] else "off", str(config["audio_volume"])],
+        check=False,
+        timeout=25,
+    )
+
+
+def launch_chromium(zoom_percent=100, audio_enabled=True):
     profile = STATE_DIR / "chromium-profile"
     cache = STATE_DIR / "chromium-cache"
     profile.mkdir(parents=True, exist_ok=True)
@@ -109,6 +121,7 @@ def launch_chromium(zoom_percent=100):
         "--kiosk",
         "--start-fullscreen",
         f"--force-device-scale-factor={zoom_percent / 100:g}",
+        "--autoplay-policy=no-user-gesture-required",
         "--noerrdialogs",
         "--disable-infobars",
         "--disable-session-crashed-bubble",
@@ -116,28 +129,36 @@ def launch_chromium(zoom_percent=100):
         "--incognito",
         "--disable-pinch",
         "--overscroll-history-navigation=0",
-        "about:blank",
+        (ROOT / "session" / "boot.html").as_uri(),
     ]
+    if not audio_enabled:
+        command.insert(-1, "--mute-audio")
     return subprocess.Popen(command)
 
 
 def supervise():
     while running:
         launch_config = load_config()
-        process = launch_chromium(launch_config["zoom_percent"])
+        configure_audio(launch_config)
+        process = launch_chromium(launch_config["zoom_percent"], launch_config["audio_enabled"])
+        launched_at = time.monotonic()
         tab_id = None
         try:
             wait_for_chromium(process)
+            remaining_boot_time = BOOT_MIN_SECONDS - (time.monotonic() - launched_at)
+            if remaining_boot_time > 0:
+                time.sleep(remaining_boot_time)
             fingerprint = None
             current = 0
             next_rotation = 0
             while running and process.poll() is None:
                 config = load_config()
-                if config["zoom_percent"] != launch_config["zoom_percent"]:
-                    print("Page zoom changed; restarting Chromium", flush=True)
+                if config["zoom_percent"] != launch_config["zoom_percent"] or config["audio_enabled"] != launch_config["audio_enabled"]:
+                    print("Display scale or audio mode changed; restarting Chromium", flush=True)
                     break
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
+                    configure_audio(config)
                     tab_id = replace_tab(config["pages"][0]["url"], tab_id)
                     fingerprint = new_fingerprint
                     current = 0

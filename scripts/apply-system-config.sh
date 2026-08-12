@@ -51,6 +51,16 @@ if ! cmp -s "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"; then
   install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"
   REMOTE_CHANGED=true
 fi
+AUDIO_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-audio.service"
+AUDIO_CHANGED=false
+if ! cmp -s "$APP_DIR/systemd/tv-kiosk-audio.service" "$AUDIO_UNIT"; then
+  install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-audio.service" "$AUDIO_UNIT"
+  AUDIO_CHANGED=true
+fi
+CHIME_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-chime.service"
+if ! cmp -s "$APP_DIR/systemd/tv-kiosk-chime.service" "$CHIME_UNIT"; then
+  install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-chime.service" "$CHIME_UNIT"
+fi
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user/default.target.wants"
 DISPLAY_DISABLED="/home/$KIOSK_USER/.config/tv-kiosk/display-disabled"
 if [ -e "$DISPLAY_DISABLED" ]; then
@@ -59,6 +69,8 @@ else
   ln -sf ../tv-kiosk-browser.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-browser.service"
 fi
 ln -sf ../tv-kiosk-remote.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-remote.service"
+ln -sf ../tv-kiosk-audio.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-audio.service"
+ln -sf ../tv-kiosk-chime.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-chime.service"
 
 # Commit helpers, sudo rules, and the browser unit to storage before any browser
 # load is started. This protects the installation if an undervoltage reset occurs.
@@ -67,6 +79,13 @@ sync
 if pgrep -x labwc >/dev/null 2>&1; then
   pkill -HUP -x labwc || true
 fi
+
+# The kiosk does not need a desktop shell or panel behind Chromium. Removing
+# them saves roughly 40 MB on the Pi and leaves a clean background during boot.
+pkill -u "$KIOSK_USER" -f '/usr/bin/lwrespawn /usr/bin/pcmanfm-pi' 2>/dev/null || true
+pkill -u "$KIOSK_USER" -f '/usr/bin/lwrespawn /usr/bin/wf-panel-pi' 2>/dev/null || true
+pkill -u "$KIOSK_USER" -x pcmanfm 2>/dev/null || true
+pkill -u "$KIOSK_USER" -x wf-panel-pi 2>/dev/null || true
 
 if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user daemon-reload || true
@@ -86,6 +105,11 @@ if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-remote.service || true
   if [ "$REMOTE_CHANGED" = true ] || ! pgrep -u "$KIOSK_USER" -f "$APP_DIR/scripts/rahamin-kiosk-remote" >/dev/null 2>&1; then
     runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-remote.service || true
+  fi
+  runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-audio.service || true
+  runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-chime.service || true
+  if [ "$AUDIO_CHANGED" = true ] || ! runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user is-active --quiet tv-kiosk-audio.service; then
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-audio.service || true
   fi
 fi
 

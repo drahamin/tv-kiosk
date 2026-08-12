@@ -1,0 +1,57 @@
+#!/bin/sh
+# Select the existing PipeWire HDMI sink without running another audio daemon.
+set -eu
+
+STATE_DIR=${KIOSK_STATE_DIR:-/home/kiosk/.config/tv-kiosk}
+CONFIG_PATH=${KIOSK_CONFIG:-$STATE_DIR/kiosk.json}
+
+if [ "$#" -ge 2 ]; then
+  AUDIO_ENABLED=$1
+  VOLUME_PERCENT=$2
+else
+  values=$(python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        config = json.load(handle)
+except (OSError, ValueError):
+    config = {}
+print("on" if config.get("audio_enabled", True) else "off", int(config.get("audio_volume", 60)))
+PY
+  )
+  set -- $values
+  AUDIO_ENABLED=$1
+  VOLUME_PERCENT=$2
+fi
+
+case "$AUDIO_ENABLED" in on|off) ;; *) exit 2 ;; esac
+case "$VOLUME_PERCENT" in ''|*[!0-9]*) exit 2 ;; esac
+[ "$VOLUME_PERCENT" -le 100 ] || exit 2
+
+attempt=0
+while [ "$attempt" -lt 20 ]; do
+  HDMI_LINE=$(wpctl status -n 2>/dev/null | sed -n '/Sinks:/,/Sources:/p' | sed -n '/[Hh][Dd][Mm][Ii]/{p;q;}')
+  HDMI_SINK=$(printf '%s\n' "$HDMI_LINE" | sed -n 's/^[^0-9]*\([0-9][0-9]*\)\..*/\1/p')
+  HDMI_NAME=$(printf '%s\n' "$HDMI_LINE" | sed -n 's/^[^0-9]*[0-9][0-9]*\. \([^ ]*\).*/\1/p')
+  [ -n "$HDMI_SINK" ] && [ -n "$HDMI_NAME" ] && break
+  attempt=$((attempt + 1))
+  sleep 1
+done
+
+if [ -z "${HDMI_SINK:-}" ]; then
+  echo "Rahamin Kiosk: HDMI audio sink is not available" >&2
+  exit 1
+fi
+
+# PipeWire node IDs can be client-local on Raspberry Pi OS. The stable node
+# name is used for the default route; the current ID is used for volume/mute.
+pw-metadata -n default 0 default.audio.sink "{\"name\":\"$HDMI_NAME\"}" Spa:String:JSON >/dev/null
+wpctl set-volume "$HDMI_SINK" "$VOLUME_PERCENT%"
+if [ "$AUDIO_ENABLED" = on ]; then
+  wpctl set-mute "$HDMI_SINK" 0
+else
+  wpctl set-mute "$HDMI_SINK" 1
+fi
+echo "Rahamin Kiosk: HDMI audio $AUDIO_ENABLED at $VOLUME_PERCENT%"

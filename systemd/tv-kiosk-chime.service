@@ -1,0 +1,13 @@
+[Unit]
+Description=Rahamin Kiosk startup and update twinkle
+After=tv-kiosk-audio.service
+Requires=tv-kiosk-audio.service
+
+[Service]
+Type=oneshot
+Environment=XDG_RUNTIME_DIR=%t
+ExecStart=/bin/sh -c '/usr/bin/python3 /opt/tv-kiosk/scripts/startup-chime.py | /usr/bin/pw-cat --playback --raw --rate=48000 --channels=2 --channel-map=stereo --format=s16 --volume=0.25 -'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

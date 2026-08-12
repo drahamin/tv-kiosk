@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Starting Rahamin Kiosk</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { display: grid; place-items: center; color: #f7f5ef; background: radial-gradient(circle at 72% 25%, #214c55 0, #10242b 34%, #070d11 74%); font-family: system-ui, sans-serif; }
+    main { width: min(900px, 78vw); }
+    .eyebrow { color: #d3a94f; font-size: 18px; font-weight: 900; letter-spacing: .24em; }
+    h1 { margin: 18px 0 12px; font: 700 clamp(52px, 7vw, 92px)/1 Georgia, serif; }
+    p { margin: 0 0 48px; color: #b9cecc; font-size: 24px; }
+    .track { height: 7px; overflow: hidden; border-radius: 20px; background: #ffffff18; }
+    .bar { width: 36%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #d3a94f, #f0d58c); animation: travel 2.2s ease-in-out infinite; }
+    .status { height: 34px; margin-top: 20px; color: #e7efed; font-size: 19px; font-weight: 700; }
+    .status span { position: absolute; opacity: 0; animation: stages 8s infinite; }
+    .status span:nth-child(2) { animation-delay: 2s; }
+    .status span:nth-child(3) { animation-delay: 4s; }
+    .status span:nth-child(4) { animation-delay: 6s; }
+    footer { position: fixed; right: 34px; bottom: 28px; color: #7e9695; font-size: 14px; letter-spacing: .12em; }
+    @keyframes travel { 0% { transform: translateX(-105%); } 50% { transform: translateX(180%); } 100% { transform: translateX(-105%); } }
+    @keyframes stages { 0%, 22% { opacity: 1; } 25%, 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">RAHAMIN OPERATIONS</div>
+    <h1>Rahamin Kiosk</h1>
+    <p>Your display is starting automatically.</p>
+    <div class="track"><div class="bar"></div></div>
+    <div class="status"><span>Starting full-screen display…</span><span>Detecting HDMI audio…</span><span>Connecting network services…</span><span>Loading live pages…</span></div>
+  </main>
+  <footer>NO INPUT REQUIRED</footer>
+</body>
+</html>
