@@ -6,13 +6,11 @@ BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 
 cd "$APP_DIR"
 
-# This idempotent root setup also runs when no source update is needed, allowing
-# an older image to receive new system helpers on the next timer pass.
-if [ -x "$APP_DIR/scripts/apply-system-config.sh" ]; then
-  "$APP_DIR/scripts/apply-system-config.sh"
-fi
-
 if ! git remote get-url origin >/dev/null 2>&1; then
+  # A locally installed image still receives idempotent system repairs.
+  if [ -x "$APP_DIR/scripts/apply-system-config.sh" ]; then
+    "$APP_DIR/scripts/apply-system-config.sh"
+  fi
   echo "No Git origin configured; leaving installed payload unchanged"
   exit 0
 fi
@@ -27,6 +25,10 @@ current=$(git rev-parse HEAD)
 target=$(git rev-parse "origin/$BRANCH")
 
 if [ "$current" = "$target" ]; then
+  # Run once even without new source so older images receive system repairs.
+  if [ -x "$APP_DIR/scripts/apply-system-config.sh" ]; then
+    "$APP_DIR/scripts/apply-system-config.sh"
+  fi
   exit 0
 fi
 

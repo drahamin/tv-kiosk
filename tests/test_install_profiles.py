@@ -47,10 +47,13 @@ class InstallProfileTests(unittest.TestCase):
 
     def test_updates_detect_and_persist_missing_hardware_profile(self):
         setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        updater = (ROOT / "scripts" / "update-kiosk.sh").read_text(encoding="utf-8")
         self.assertIn('KIOSK_PROFILE=auto KIOSK_HARDWARE_MODEL="$HARDWARE_MODEL"', setup)
         self.assertIn("KIOSK_HARDWARE_PROFILE=%s", setup)
         self.assertIn("config/kiosk-admin.pub", setup)
         self.assertIn('"/home/$KIOSK_USER/.ssh/authorized_keys"', setup)
+        self.assertEqual(updater.count('git merge --ff-only "$target"'), 1)
+        self.assertLess(updater.index('git fetch --quiet origin "$BRANCH"'), updater.index('git merge --ff-only "$target"'))
 
     def test_profile_branding_and_hdmi_fallbacks_are_installed(self):
         boot = (ROOT / "session" / "boot.html").read_text(encoding="utf-8")
