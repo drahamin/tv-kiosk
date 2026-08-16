@@ -38,7 +38,7 @@ def load_config():
     if not 1 <= len(pages) <= 5:
         raise ValueError("Rahamin Kiosk requires one to five enabled pages")
     return {
-        "rotation_seconds": max(5, int(config.get("rotation_seconds", 25))),
+        "rotation_seconds": max(5, int(config.get("rotation_seconds", 45))),
         "zoom_percent": int(config.get("zoom_percent", 100)),
         "audio_enabled": bool(config.get("audio_enabled", True)),
         "audio_volume": int(config.get("audio_volume", 60)),
