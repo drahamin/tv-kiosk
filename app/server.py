@@ -73,7 +73,7 @@ def validate_config(config):
     if not any(page["enabled"] for page in pages):
         raise ValueError("At least one page must be enabled")
 
-    interval = int(config.get("rotation_seconds", 25))
+    interval = int(config.get("rotation_seconds", 45))
     if not 5 <= interval <= 3600:
         raise ValueError("Rotation time must be between 5 and 3600 seconds")
     port = int(config.get("listen_port", os.environ.get("KIOSK_PORT", "8999")))
@@ -600,7 +600,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(403, "text/plain; charset=utf-8", "Invalid security token\n")
                 return
             if path == "/admin/settings":
-                config = save_config({"title": form.get("title", ""), "listen_port": form.get("listen_port", "8999"), "rotation_seconds": form.get("rotation_seconds", "25"), "transition_seconds": form.get("transition_seconds", "0.7"), "zoom_percent": form.get("zoom_percent", "100"), "audio_enabled": form.get("audio_enabled") == "on", "audio_volume": form.get("audio_volume", "60"), "show_status": form.get("show_status") == "on", "setup_complete": form.get("setup_complete") == "on", "background": form.get("background", "#080706"), "theme": form.get("theme", "rahamin"), "pages": [{"name": form.get(f"page_{i}_name", ""), "url": form.get(f"page_{i}_url", ""), "enabled": form.get(f"page_{i}_enabled") == "on"} for i in range(1, MAX_PAGES + 1)]})
+                config = save_config({"title": form.get("title", ""), "listen_port": form.get("listen_port", "8999"), "rotation_seconds": form.get("rotation_seconds", "45"), "transition_seconds": form.get("transition_seconds", "0.7"), "zoom_percent": form.get("zoom_percent", "100"), "audio_enabled": form.get("audio_enabled") == "on", "audio_volume": form.get("audio_volume", "60"), "show_status": form.get("show_status") == "on", "setup_complete": form.get("setup_complete") == "on", "background": form.get("background", "#080706"), "theme": form.get("theme", "rahamin"), "pages": [{"name": form.get(f"page_{i}_name", ""), "url": form.get(f"page_{i}_url", ""), "enabled": form.get(f"page_{i}_enabled") == "on"} for i in range(1, MAX_PAGES + 1)]})
                 self.reply(200, "text/html; charset=utf-8", admin_page(config, session, "Settings saved. The live playlist will reload automatically."))
             elif path == "/admin/network":
                 if not Path("/usr/local/sbin/rahamin-kiosk-network").exists():

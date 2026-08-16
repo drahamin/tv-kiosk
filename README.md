@@ -2,7 +2,7 @@
 
 Rahamin Kiosk is a full-screen, remotely managed display for a 75-inch 16:9
 Samsung television. It can rotate up to five enabled web pages at a configurable
-interval. The default playlist rotates every 25 seconds:
+interval. The default playlist rotates every 45 seconds:
 
 1. Rahamin ADS-B TV
 2. Rahamin AIS TV (Miami)

@@ -15,6 +15,7 @@ class KioskServerTests(unittest.TestCase):
         self.assertEqual(weather["Miami Weather"]["url"], "http://192.168.86.196:8999/miami")
         self.assertEqual(weather["Sicily Weather"]["url"], "http://192.168.86.196:8999/sicily")
         self.assertTrue(all(page["enabled"] for page in weather.values()))
+        self.assertEqual(default["rotation_seconds"], 45)
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
