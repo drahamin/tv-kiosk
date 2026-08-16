@@ -36,6 +36,14 @@ EOF
 
 fi
 
+# Keep a known, recoverable maintenance key on every kiosk. This also repairs
+# early images that were provisioned with a public key whose private half was
+# not retained on the maintenance Mac.
+if [ -s "$APP_DIR/config/kiosk-admin.pub" ]; then
+  install -d -m 0700 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.ssh"
+  install -m 0600 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/config/kiosk-admin.pub" "/home/$KIOSK_USER/.ssh/authorized_keys"
+fi
+
 # Keep HDMI enabled when a Samsung TV powers up slowly or briefly drops HPD.
 # EDID remains enabled so multi-profile Pis use the TV's preferred mode. The
 # Zero profile uses a stable 1080p60 fallback to keep GPU/memory load bounded.
