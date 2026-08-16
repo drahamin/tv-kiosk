@@ -13,7 +13,7 @@
   "pages": [
     {
       "name": "Baiamonte TV Dashboard",
-      "url": "http://192.168.0.10:8123/lovelace/0",
+      "url": "http://192.168.0.10:8998/tv",
       "enabled": true
     }
   ]

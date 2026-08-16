@@ -13,10 +13,9 @@ interval. The default playlist rotates every 45 seconds:
 The same installer automatically selects a lighter **Baiamonte Pi Zero** profile
 on every Pi Zero and Pi Zero 2. That profile opens one full-screen Baiamonte
 dashboard, never rotates or reloads it on a timer, and keeps only one Chromium
-renderer. Images built with the private installer settings use the external Nabu
-Casa dashboard; the public fallback is `http://rahamin-adsb.local:8998/tv`.
-The Pi Zero defaults to the VPN-local Baiamonte Home Assistant dashboard at
-`http://192.168.0.10:8123/lovelace/0`. Set `BAIAMONTE_TV_URL` during image
+renderer on Pi Zero 2 or one ARMv6-compatible Cog renderer on the original Zero.
+The Pi Zero defaults to the VPN-local Baiamonte ADS-B TV display at
+`http://192.168.0.10:8998/tv`. Set `BAIAMONTE_TV_URL` during image
 creation or edit Page 1 in Admin to change it.
 Pi 3, Pi 4, and Pi 5 continue to use the five-page profile.
 
@@ -173,14 +172,12 @@ WIFI_PRIMARY_SSID=Home
 WIFI_SECONDARY_SSID=Baiamonte
 WIFI_PSK=your-shared-password
 KIOSK_PROFILE=auto
-BAIAMONTE_TV_URL=http://192.168.0.10:8123/lovelace/0
+BAIAMONTE_TV_URL=http://192.168.0.10:8998/tv
 KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
 ```
 
-The current Baiamonte cloud host answers at `/lovelace/0`; its `/tv` route
-currently returns 404. If a `/tv` dashboard is later added to Home Assistant,
-set `BAIAMONTE_TV_URL` to an alternate local or external URL without changing the image
-software.
+Set `BAIAMONTE_TV_URL` to an alternate local or external display URL without
+changing the image software.
 
 Wi-Fi credentials are read from the ignored `image/config.local.env`; see
 `image/config.example.env`. The generated image contains the Wi-Fi password, so

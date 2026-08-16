@@ -16,7 +16,7 @@ fi
 : "${WIFI_PRIMARY_SSID:=Home}"
 : "${WIFI_SECONDARY_SSID:=Baiamonte}"
 : "${KIOSK_PROFILE:=auto}"
-: "${BAIAMONTE_TV_URL:=http://192.168.0.10:8123/lovelace/0}"
+: "${BAIAMONTE_TV_URL:=http://192.168.0.10:8998/tv}"
 
 progress() {
   printf '\n\033[1;36m[%s/6]\033[0m \033[1m%s\033[0m\n' "$1" "$2"

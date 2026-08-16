@@ -28,7 +28,7 @@ class InstallProfileTests(unittest.TestCase):
         config = json.loads((ROOT / "config" / "kiosk-zero.json").read_text(encoding="utf-8"))
         self.assertTrue(config["setup_complete"])
         self.assertEqual(len(config["pages"]), 1)
-        self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8123/lovelace/0")
+        self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8998/tv")
 
     def test_universal_image_contains_dual_wifi_and_profile_settings(self):
         builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
