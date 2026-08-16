@@ -1,7 +1,7 @@
 [Unit]
 Description=Install Rahamin Kiosk on first boot
 Wants=NetworkManager.service
-After=NetworkManager.service systemd-user-sessions.service cloud-final.service userconfig.service del-wizard.service
+After=NetworkManager.service systemd-user-sessions.service cloud-final.service
 Before=display-manager.service getty@tty1.service
 Conflicts=display-manager.service getty@tty1.service
 ConditionPathExists=/opt/tv-kiosk-bootstrap/install.sh

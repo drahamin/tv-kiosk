@@ -38,6 +38,12 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("Rahamin-Baiamonte", builder)
         self.assertIn("KIOSK_PROFILE", builder)
         self.assertIn("rahamin-kiosk-universal.img", builder)
+        self.assertIn("raspios_lite_armhf_latest", builder)
+        self.assertIn("band=bg", builder)
+        self.assertIn("powersave=2", builder)
+        self.assertIn("logo.nologo", builder)
+        self.assertIn("disable_splash=1", builder)
+        self.assertIn("userconfig.service", builder)
 
     def test_updates_detect_and_persist_missing_hardware_profile(self):
         setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
@@ -56,6 +62,13 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("hdmi_force_edid_audio=1", setup)
         self.assertIn("hdmi_group=1", setup)
         self.assertIn("hdmi_mode=16", setup)
+
+    def test_firstboot_explicitly_tries_both_wifi_profiles_without_wizard(self):
+        firstboot = (ROOT / "image" / "tv-kiosk-firstboot").read_text(encoding="utf-8")
+        unit = (ROOT / "image" / "tv-kiosk-firstboot.service").read_text(encoding="utf-8")
+        self.assertIn('"$WIFI_PRIMARY_SSID" "$WIFI_SECONDARY_SSID"', firstboot)
+        self.assertIn('connection up "Rahamin WiFi $wifi_ssid"', firstboot)
+        self.assertNotIn("userconfig.service", unit)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,9 @@ for command in curl losetup mcopy mount openssl umount xz; do
 done
 
 if [[ -z "$RPI_OS_IMAGE_URL" ]]; then
-  RPI_OS_IMAGE_URL=https://downloads.raspberrypi.com/raspios_armhf_latest
+  # Lite has no Raspberry desktop, welcome wizard, panel, or file manager. The
+  # kiosk installer adds only X, Openbox, Chromium, audio, and maintenance tools.
+  RPI_OS_IMAGE_URL=https://downloads.raspberrypi.com/raspios_lite_armhf_latest
 fi
 
 WORK_DIR=$(mktemp -d)
@@ -75,8 +77,21 @@ touch "$WORK_DIR/ssh"
 mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/ssh" ::ssh
 mcopy -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" ::cmdline.txt "$WORK_DIR/cmdline.txt"
 sed -i -E 's/[[:space:]]+cfg80211\.ieee80211_regdom=[^[:space:]]+//g' "$WORK_DIR/cmdline.txt"
-sed -i "s/$/ cfg80211.ieee80211_regdom=$WIFI_COUNTRY/" "$WORK_DIR/cmdline.txt"
+sed -i -E 's/[[:space:]]+(logo\.nologo|quiet|loglevel=[^[:space:]]+|vt\.global_cursor_default=[^[:space:]]+)//g' "$WORK_DIR/cmdline.txt"
+sed -i "s/$/ cfg80211.ieee80211_regdom=$WIFI_COUNTRY logo.nologo quiet loglevel=3 vt.global_cursor_default=0/" "$WORK_DIR/cmdline.txt"
 mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/cmdline.txt" ::cmdline.txt
+mcopy -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" ::config.txt "$WORK_DIR/config.txt"
+if ! grep -q '^# BEGIN Rahamin Kiosk boot branding$' "$WORK_DIR/config.txt"; then
+  cat >> "$WORK_DIR/config.txt" <<'EOF'
+
+[all]
+# BEGIN Rahamin Kiosk boot branding
+# Suppress the stock rainbow/Raspberry splash; the kiosk displays its own logo.
+disable_splash=1
+# END Rahamin Kiosk boot branding
+EOF
+fi
+mcopy -o -i "$OUTPUT_IMAGE@@$((BOOT_START * 512))" "$WORK_DIR/config.txt" ::config.txt
 
 ROOT_LOOP=$(losetup --find --show --offset "$((ROOT_START * 512))" --sizelimit "$((ROOT_SECTORS * 512))" "$OUTPUT_IMAGE")
 mount "$ROOT_LOOP" "$WORK_DIR/root"
@@ -96,10 +111,13 @@ id=Rahamin WiFi $escaped_ssid
 type=wifi
 autoconnect=true
 autoconnect-priority=$priority
+autoconnect-retries=0
 
 [wifi]
 mode=infrastructure
 ssid=$escaped_ssid
+band=bg
+powersave=2
 
 [wifi-security]
 key-mgmt=wpa-psk
@@ -163,11 +181,18 @@ install -m 0644 "$ROOT_DIR/image/tv-kiosk-firstboot.service" "$WORK_DIR/root/etc
   printf 'KIOSK_UPDATE_BRANCH=%q\n' "$KIOSK_UPDATE_BRANCH"
   printf 'KIOSK_REPO_URL=%q\n' "$KIOSK_REPO_URL"
   printf 'WIFI_COUNTRY=%q\n' "$WIFI_COUNTRY"
+  printf 'WIFI_PRIMARY_SSID=%q\n' "$WIFI_PRIMARY_SSID"
+  printf 'WIFI_SECONDARY_SSID=%q\n' "$WIFI_SECONDARY_SSID"
   printf 'KIOSK_PROFILE=%q\n' "$KIOSK_PROFILE"
   printf 'BAIAMONTE_TV_URL=%q\n' "$BAIAMONTE_TV_URL"
 } > "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 chmod 600 "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/tv-kiosk-firstboot.service"
+
+# The stock first-run wizard can seize the display and wait forever for input.
+# This image is fully provisioned and must remain keyboard-free.
+rm -f "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/userconfig.service"
+ln -sf /dev/null "$WORK_DIR/root/etc/systemd/system/userconfig.service"
 
 if [[ -e "$WORK_DIR/root/lib/systemd/system/ssh.service" ]]; then
   ln -sf /lib/systemd/system/ssh.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/ssh.service"

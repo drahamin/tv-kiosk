@@ -13,6 +13,8 @@ fi
 : "${KIOSK_UPDATE_BRANCH:=main}"
 : "${KIOSK_REPO_URL:=}"
 : "${WIFI_COUNTRY:=US}"
+: "${WIFI_PRIMARY_SSID:=Home}"
+: "${WIFI_SECONDARY_SSID:=Baiamonte}"
 : "${KIOSK_PROFILE:=auto}"
 : "${BAIAMONTE_TV_URL:=http://rahamin-adsb.local:8998/tv}"
 
@@ -63,6 +65,16 @@ fi
 rfkill unblock wifi >> "$LOG_FILE" 2>&1 || true
 nmcli radio wifi on >> "$LOG_FILE" 2>&1 || true
 systemctl restart NetworkManager.service >> "$LOG_FILE" 2>&1 || true
+nmcli connection reload >> "$LOG_FILE" 2>&1 || true
+nmcli device set wlan0 managed yes >> "$LOG_FILE" 2>&1 || true
+nmcli device wifi rescan ifname wlan0 >> "$LOG_FILE" 2>&1 || true
+# Pi Zero Wi-Fi is 2.4 GHz only. Try both preloaded roaming profiles explicitly
+# instead of relying on NetworkManager's background autoconnect timing.
+for wifi_ssid in "$WIFI_PRIMARY_SSID" "$WIFI_SECONDARY_SSID"; do
+  if nmcli --wait 25 connection up "Rahamin WiFi $wifi_ssid" ifname wlan0 >> "$LOG_FILE" 2>&1; then
+    break
+  fi
+done
 if ! nm-online --wait-for-startup --quiet --timeout=180 >> "$LOG_FILE" 2>&1; then
   printf 'Wi-Fi is not ready yet. A retry will start automatically.\n' >> "$LOG_FILE"
   exit 1
