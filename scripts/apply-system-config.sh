@@ -13,7 +13,11 @@ STATE_DIR=/var/lib/rahamin-kiosk
 if [ -r /etc/tv-kiosk/kiosk.env ]; then
   . /etc/tv-kiosk/kiosk.env
 fi
-KIOSK_HARDWARE_PROFILE=${KIOSK_HARDWARE_PROFILE:-multi}
+if [ -z "${KIOSK_HARDWARE_PROFILE:-}" ]; then
+  HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
+  KIOSK_HARDWARE_PROFILE=$(KIOSK_PROFILE=auto KIOSK_HARDWARE_MODEL="$HARDWARE_MODEL" sh "$APP_DIR/scripts/detect-hardware-profile")
+  printf 'KIOSK_HARDWARE_PROFILE=%s\n' "$KIOSK_HARDWARE_PROFILE" >> /etc/tv-kiosk/kiosk.env
+fi
 
 if [ "$KIOSK_HARDWARE_PROFILE" = zero ]; then
   cat > /etc/default/zramswap <<'EOF'
