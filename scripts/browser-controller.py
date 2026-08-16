@@ -164,7 +164,7 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None)
         f"--disk-cache-size={cache_size}",
         "--disable-pinch",
         "--overscroll-history-navigation=0",
-        (ROOT / "session" / "boot.html").as_uri(),
+        f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile={quote(profile_name)}",
     ]
     if profile_name == "zero":
         command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", "--js-flags=--max-old-space-size=192"]

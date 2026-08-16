@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" role="img" aria-labelledby="title desc">
+  <title id="title">Baiamonte Tenuta</title>
+  <desc id="desc">Gold Baiamonte crown and wordmark</desc>
+  <g fill="none" stroke="#d7b66d" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M180 105c70 0 118-28 151-77 7 40 26 55 49 58 23-3 42-18 49-58 33 49 81 77 151 77" stroke-width="8"/>
+    <path d="M325 74l-17-43 43 29 29-48 29 48 43-29-17 43" stroke-width="8"/>
+  </g>
+  <g fill="#be263e">
+    <circle cx="308" cy="22" r="7"/><circle cx="380" cy="7" r="7"/><circle cx="452" cy="22" r="7"/>
+    <text x="365" y="100" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="700">N</text>
+  </g>
+  <text x="380" y="224" text-anchor="middle" fill="#f7f5ef" font-family="Arial,Helvetica,sans-serif" font-size="82" font-weight="300" letter-spacing="18">BAIAMONTE</text>
+  <text x="380" y="286" text-anchor="middle" fill="#aaa5a2" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="400" letter-spacing="22">TENUTA</text>
+</svg>

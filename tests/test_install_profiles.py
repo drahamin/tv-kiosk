@@ -44,6 +44,19 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn('KIOSK_PROFILE=auto KIOSK_HARDWARE_MODEL="$HARDWARE_MODEL"', setup)
         self.assertIn("KIOSK_HARDWARE_PROFILE=%s", setup)
 
+    def test_profile_branding_and_hdmi_fallbacks_are_installed(self):
+        boot = (ROOT / "session" / "boot.html").read_text(encoding="utf-8")
+        browser = (ROOT / "scripts" / "browser-controller.py").read_text(encoding="utf-8")
+        setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        self.assertIn("baiamonte-logo.svg", boot)
+        self.assertIn("miami-logo.svg", boot)
+        self.assertIn("?profile={quote(profile_name)}", browser)
+        self.assertIn("display_auto_detect=1", setup)
+        self.assertIn("hdmi_force_hotplug=1", setup)
+        self.assertIn("hdmi_force_edid_audio=1", setup)
+        self.assertIn("hdmi_group=1", setup)
+        self.assertIn("hdmi_mode=16", setup)
+
 
 if __name__ == "__main__":
     unittest.main()

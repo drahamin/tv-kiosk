@@ -8,13 +8,14 @@
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body { display: grid; place-items: center; color: #f7f5ef; background: radial-gradient(circle at 72% 25%, #214c55 0, #10242b 34%, #070d11 74%); font-family: system-ui, sans-serif; }
-    main { width: min(900px, 78vw); }
+    main { width: min(980px, 82vw); text-align: center; }
+    .brand { display: block; width: min(700px, 70vw); max-height: 270px; margin: 0 auto 34px; object-fit: contain; }
     .eyebrow { color: #d3a94f; font-size: 18px; font-weight: 900; letter-spacing: .24em; }
     h1 { margin: 18px 0 12px; font: 700 clamp(52px, 7vw, 92px)/1 Georgia, serif; }
     p { margin: 0 0 48px; color: #b9cecc; font-size: 24px; }
     .track { height: 7px; overflow: hidden; border-radius: 20px; background: #ffffff18; }
     .bar { width: 36%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #d3a94f, #f0d58c); animation: travel 2.2s ease-in-out infinite; }
-    .status { height: 34px; margin-top: 20px; color: #e7efed; font-size: 19px; font-weight: 700; }
+    .status { position: relative; height: 34px; margin-top: 20px; color: #e7efed; font-size: 19px; font-weight: 700; text-align: left; }
     .status span { position: absolute; opacity: 0; animation: stages 8s infinite; }
     .status span:nth-child(2) { animation-delay: 2s; }
     .status span:nth-child(3) { animation-delay: 4s; }
@@ -26,12 +27,22 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">RAHAMIN OPERATIONS</div>
-    <h1>Rahamin Kiosk</h1>
+    <img class="brand" id="brand-logo" src="miami-logo.svg" alt="Miami Shores Residence">
+    <div class="eyebrow" id="brand-name">MIAMI SHORES · RAHAMIN KIOSK</div>
+    <h1 id="heading">Miami Display</h1>
     <p>Your display is starting automatically.</p>
     <div class="track"><div class="bar"></div></div>
     <div class="status"><span>Starting full-screen display…</span><span>Detecting HDMI audio…</span><span>Connecting network services…</span><span>Loading live pages…</span></div>
   </main>
   <footer>NO INPUT REQUIRED</footer>
+  <script>
+    const zero = new URLSearchParams(location.search).get("profile") === "zero";
+    if (zero) {
+      document.getElementById("brand-logo").src = "baiamonte-logo.svg";
+      document.getElementById("brand-logo").alt = "Baiamonte Tenuta";
+      document.getElementById("brand-name").textContent = "BAIAMONTE · RAHAMIN KIOSK";
+      document.getElementById("heading").textContent = "Baiamonte Display";
+    }
+  </script>
 </body>
 </html>
