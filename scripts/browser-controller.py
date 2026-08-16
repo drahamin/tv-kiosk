@@ -181,7 +181,7 @@ def launch_cog(url):
     return subprocess.Popen([
         COG,
         "--platform=wl",
-        "--enable-page-cache=true",
+        "--enable-page-cache=false",
         "--enable-offline-web-application-cache=true",
         "--enable-smooth-scrolling=false",
         url,

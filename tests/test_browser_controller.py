@@ -63,7 +63,7 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertEqual(command, [
             "cog",
             "--platform=wl",
-            "--enable-page-cache=true",
+            "--enable-page-cache=false",
             "--enable-offline-web-application-cache=true",
             "--enable-smooth-scrolling=false",
             "https://cloud.example/tv",
