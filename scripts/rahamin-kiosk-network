@@ -51,6 +51,16 @@ def connection_for(device, fallback_name, kind):
     return fallback_name
 
 
+def device_for(kind, fallback):
+    expected = "wifi" if kind == "wifi" else "ethernet"
+    rows = run("nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status", check=False).stdout.splitlines()
+    for row in rows:
+        device, _, device_type = row.partition(":")
+        if device_type == expected:
+            return device
+    return fallback
+
+
 def apply_ip(connection, prefix, data, version):
     family = f"ipv{version}"
     mode = data[f"{prefix}_mode"]
@@ -79,7 +89,8 @@ def apply(data):
         validate_ip_settings(prefix, data, version)
 
     run("hostnamectl", "set-hostname", data["hostname"])
-    wifi = connection_for("wlan0", "Rahamin WiFi", "wifi")
+    wifi_device = device_for("wifi", "wlan0")
+    wifi = connection_for(wifi_device, "Rahamin WiFi", "wifi")
     run("nmcli", "connection", "modify", wifi, "connection.autoconnect", "yes" if data["wifi_autoconnect"] else "no", "802-11-wireless.ssid", data["wifi_ssid"])
     if data["wifi_mac_policy"] == "preserve":
         run("nmcli", "connection", "modify", wifi, "802-11-wireless.cloned-mac-address", "preserve")
@@ -94,7 +105,8 @@ def apply(data):
     apply_ip(wifi, "wifi_ipv4", data, 4)
     apply_ip(wifi, "wifi_ipv6", data, 6)
 
-    ethernet = connection_for("eth0", "Rahamin Ethernet", "ethernet")
+    ethernet_device = device_for("ethernet", "eth0")
+    ethernet = connection_for(ethernet_device, "Rahamin Ethernet", "ethernet")
     run("nmcli", "connection", "modify", ethernet, "connection.autoconnect", "yes" if data["ethernet_enabled"] else "no")
     apply_ip(ethernet, "ethernet_ipv4", data, 4)
     apply_ip(ethernet, "ethernet_ipv6", data, 6)

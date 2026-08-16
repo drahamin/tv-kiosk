@@ -17,6 +17,11 @@ class KioskServerTests(unittest.TestCase):
         self.assertTrue(all(page["enabled"] for page in weather.values()))
         self.assertEqual(default["rotation_seconds"], 45)
 
+    def test_pi_zero_default_contains_one_baiamonte_page(self):
+        default = json.loads((MODULE_PATH.parents[1] / "config" / "kiosk-zero.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(default["pages"]), 1)
+        self.assertEqual(default["pages"][0]["name"], "Baiamonte TV Dashboard")
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         config = {

@@ -18,6 +18,7 @@ CONFIG_PATH = Path(os.environ.get("KIOSK_CONFIG", STATE_DIR / "kiosk.json"))
 DEFAULT_CONFIG = ROOT / "config" / "kiosk.json"
 DEBUG_PORT = int(os.environ.get("KIOSK_DEBUG_PORT", "9222"))
 CHROMIUM = os.environ.get("KIOSK_CHROMIUM", "chromium")
+HARDWARE_PROFILE = os.environ.get("KIOSK_HARDWARE_PROFILE", "multi").strip().lower()
 running = True
 requested_step = 0
 BOOT_MIN_SECONDS = 4
@@ -43,6 +44,8 @@ def load_config():
         port = int(config.get("listen_port", 8999))
         return {"rotation_seconds": 3600, "zoom_percent": int(config.get("zoom_percent", 100)), "audio_enabled": bool(config.get("audio_enabled", True)), "audio_volume": int(config.get("audio_volume", 60)), "pages": [{"name": "Configure Rahamin Kiosk", "url": f"http://127.0.0.1:{port}/setup"}]}
     pages = [page for page in config.get("pages", []) if page.get("enabled", True) and page.get("url")]
+    if HARDWARE_PROFILE == "zero":
+        pages = pages[:1]
     if not 1 <= len(pages) <= 5:
         raise ValueError("Rahamin Kiosk requires one to five enabled pages")
     return {
@@ -125,12 +128,15 @@ def display_size():
     return 1920, 1080
 
 
-def launch_chromium(zoom_percent=100, audio_enabled=True):
+def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None):
     profile = STATE_DIR / "chromium-profile"
     cache = STATE_DIR / "chromium-cache"
     profile.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
     width, height = display_size()
+    profile_name = hardware_profile or HARDWARE_PROFILE
+    renderer_limit = 1 if profile_name == "zero" else 3
+    cache_size = 134217728 if profile_name == "zero" else 268435456
     command = [
         CHROMIUM,
         "--ozone-platform=wayland",
@@ -154,12 +160,14 @@ def launch_chromium(zoom_percent=100, audio_enabled=True):
         "--disable-component-update",
         "--disable-sync",
         "--metrics-recording-only",
-        "--renderer-process-limit=3",
-        "--disk-cache-size=268435456",
+        f"--renderer-process-limit={renderer_limit}",
+        f"--disk-cache-size={cache_size}",
         "--disable-pinch",
         "--overscroll-history-navigation=0",
         (ROOT / "session" / "boot.html").as_uri(),
     ]
+    if profile_name == "zero":
+        command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", "--js-flags=--max-old-space-size=192"]
     if not audio_enabled:
         command.insert(-1, "--mute-audio")
     return subprocess.Popen(command)
@@ -192,15 +200,17 @@ def supervise():
                     tab_id = replace_tab(config["pages"][0]["url"], tab_id)
                     fingerprint = new_fingerprint
                     current = 0
-                    next_rotation = time.monotonic() + config["rotation_seconds"]
+                    next_rotation = float("inf") if len(config["pages"]) == 1 else time.monotonic() + config["rotation_seconds"]
                     print("Loaded kiosk playlist:", ", ".join(page["name"] for page in config["pages"]), flush=True)
-                if requested_step:
+                if requested_step and len(config["pages"]) > 1:
                     step = requested_step
                     requested_step = 0
                     current = (current + step) % len(config["pages"])
                     tab_id = replace_tab(config["pages"][current]["url"], tab_id)
                     print(f"Remote selected page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
+                elif requested_step:
+                    requested_step = 0
                 if time.monotonic() >= next_rotation:
                     current = (current + 1) % len(config["pages"])
                     tab_id = replace_tab(config["pages"][current]["url"], tab_id)

@@ -7,7 +7,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 STATE_DIR=/var/lib/rahamin-kiosk
-MARKER="$STATE_DIR/cleanup-v1"
+MARKER="$STATE_DIR/cleanup-v2"
 if [ -e "$MARKER" ]; then
   exit 0
 fi
@@ -17,6 +17,12 @@ fi
 for unit in bluetooth.service rpcbind.service rpcbind.socket nfs-blkmap.service; do
   systemctl disable --now "$unit" >/dev/null 2>&1 || true
 done
+
+if grep -q '^KIOSK_HARDWARE_PROFILE=zero$' /etc/tv-kiosk/kiosk.env 2>/dev/null; then
+  for unit in cups.service cups.socket cups.path cups-browsed.service ModemManager.service; do
+    systemctl disable --now "$unit" >/dev/null 2>&1 || true
+  done
+fi
 
 apt-get clean
 journalctl --vacuum-size=50M >/dev/null 2>&1 || true

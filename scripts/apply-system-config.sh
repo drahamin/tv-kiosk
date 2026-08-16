@@ -10,6 +10,41 @@ APP_DIR=${KIOSK_APP_DIR:-/opt/tv-kiosk}
 KIOSK_USER=${KIOSK_USER:-kiosk}
 KIOSK_UID=$(id -u "$KIOSK_USER")
 STATE_DIR=/var/lib/rahamin-kiosk
+if [ -r /etc/tv-kiosk/kiosk.env ]; then
+  . /etc/tv-kiosk/kiosk.env
+fi
+KIOSK_HARDWARE_PROFILE=${KIOSK_HARDWARE_PROFILE:-multi}
+
+if [ "$KIOSK_HARDWARE_PROFILE" = zero ]; then
+  cat > /etc/default/zramswap <<'EOF'
+ALGO=zstd
+PERCENT=50
+PRIORITY=100
+EOF
+  cat > /etc/sysctl.d/90-rahamin-kiosk-zero.conf <<'EOF'
+vm.swappiness=80
+vm.vfs_cache_pressure=100
+vm.dirty_background_ratio=5
+vm.dirty_ratio=15
+EOF
+  systemctl enable --now zramswap.service >/dev/null 2>&1 || true
+  systemctl disable --now dphys-swapfile.service >/dev/null 2>&1 || true
+
+  BOOT_CONFIG=/boot/firmware/config.txt
+  [ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
+  if [ -f "$BOOT_CONFIG" ] && ! grep -q 'Rahamin Pi Zero Samsung HDMI' "$BOOT_CONFIG"; then
+    cat >> "$BOOT_CONFIG" <<'EOF'
+
+# Rahamin Pi Zero Samsung HDMI: stable 1080p, audio-capable output.
+hdmi_force_hotplug=1
+hdmi_drive=2
+hdmi_group=1
+hdmi_mode=16
+disable_overscan=1
+max_framebuffers=1
+EOF
+  fi
+fi
 
 if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1; then
   apt-get update

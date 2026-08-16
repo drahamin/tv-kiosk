@@ -42,6 +42,17 @@ class BrowserControllerTests(unittest.TestCase):
             controller.launch_chromium(100, False)
         self.assertIn("--mute-audio", popen.call_args.args[0])
 
+    def test_pi_zero_uses_one_renderer_and_smaller_cache(self):
+        fake = MagicMock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+            controller.launch_chromium(100, True, "zero")
+        command = popen.call_args.args[0]
+        self.assertIn("--renderer-process-limit=1", command)
+        self.assertIn("--disk-cache-size=134217728", command)
+        self.assertIn("--enable-low-end-device-mode", command)
+        self.assertIn("--process-per-site", command)
+        self.assertIn("--js-flags=--max-old-space-size=192", command)
+
     def test_load_config_filters_disabled_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "kiosk.json"
@@ -56,6 +67,17 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertEqual(config["zoom_percent"], 100)
         self.assertTrue(config["audio_enabled"])
         self.assertEqual(config["audio_volume"], 60)
+
+    def test_pi_zero_loads_only_first_enabled_page(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "kiosk.json"
+            path.write_text(json.dumps({"setup_complete": True, "pages": [
+                {"name": "Baiamonte", "url": "https://cloud.example/tv", "enabled": True},
+                {"name": "Heavy map", "url": "https://map.example/tv", "enabled": True},
+            ]}), encoding="utf-8")
+            with patch.object(controller, "CONFIG_PATH", path), patch.object(controller, "HARDWARE_PROFILE", "zero"):
+                config = controller.load_config()
+        self.assertEqual(config["pages"], [{"name": "Baiamonte", "url": "https://cloud.example/tv"}])
 
     def test_display_size_uses_current_hdmi_mode(self):
         result = MagicMock(stdout="HDMI-A-1\n  3840x2160 px, 60.000000 Hz (current)\n")

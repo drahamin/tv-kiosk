@@ -1,4 +1,4 @@
-# Rahamin Kiosk for Raspberry Pi 3 and Raspberry Pi 4
+# Rahamin Kiosk for Raspberry Pi Zero, 3, 4, and 5
 
 Rahamin Kiosk is a full-screen, remotely managed display for a 75-inch 16:9
 Samsung television. It can rotate up to five enabled web pages at a configurable
@@ -10,6 +10,14 @@ interval. The default playlist rotates every 45 seconds:
 4. Miami Weather
 5. Sicily Weather
 
+The same installer automatically selects a lighter **Baiamonte Pi Zero** profile
+on every Pi Zero and Pi Zero 2. That profile opens one full-screen Baiamonte
+dashboard, never rotates or reloads it on a timer, and keeps only one Chromium
+renderer. Images built with the private installer settings use the external Nabu
+Casa dashboard; the public fallback is `http://rahamin-adsb.local:8998/tv`.
+Set `BAIAMONTE_TV_URL` during image creation or edit Page 1 in Admin to change it.
+Pi 3, Pi 4, and Pi 5 continue to use the five-page profile.
+
 The local service listens on port `8999` by default and provides:
 
 - `/` and `/tv` — rotating full-screen playlist
@@ -20,7 +28,9 @@ The local service listens on port `8999` by default and provides:
 
 ## First deployment
 
-Ethernet and the preloaded `Home` Wi-Fi connection both use DHCP. A new image
+Ethernet and the preloaded `Home` and `Baiamonte` Wi-Fi connections use DHCP.
+Both Wi-Fi profiles use the one `WIFI_PSK` supplied privately during the image
+build, and the kiosk automatically joins whichever is available. A new image
 opens the setup screen on the TV and displays every detected IPv4 address, the
 `.local` address, and the admin URL. No keyboard is required.
 
@@ -99,10 +109,18 @@ updates, and installs supervised browser recovery. It also disables unused
 Bluetooth and NFS/RPC services and safely trims old package archives, logs, and
 crash reports without removing required Raspberry Pi components.
 
-The same image supports Raspberry Pi 3B/3B+ and Raspberry Pi 4B. Pi 4 uses its
+The same image supports Pi Zero/Zero W/Zero 2 W, Raspberry Pi 3B/3B+, Pi 4B,
+and Pi 5. Pi 4 uses its
 first micro-HDMI port and should use a proper 5V/3A USB-C supply. Pi 3 should use
 a reliable 5V/2.5A micro-USB supply. Undervoltage can reset either model while
 Chromium is loading map pages.
+
+On Pi Zero, installation enables compressed RAM swap, disables unused printing,
+Bluetooth, modem, NFS, and RPC services, limits Chromium to one renderer and a
+128 MB disk cache, caps its JavaScript heap, and configures a stable 1080p60
+HDMI mode with audio for Samsung televisions. SSH, NetworkManager, the Admin
+page, HDMI-CEC, audible startup/update confirmation, browser supervision, and
+the GitHub updater remain enabled. USB Ethernet adapters use DHCP automatically.
 
 The attached TV rotates full Chromium tabs instead of embedding remote pages.
 This avoids remote `X-Frame-Options` restrictions and keeps memory use reasonable
@@ -130,9 +148,9 @@ On an Ubuntu Linux machine with `sudo`, `curl`, `xz`, `losetup`, `mtools`, and
 sudo ./image/build-image.sh
 ```
 
-The builder downloads Raspberry Pi OS Desktop 32-bit for Pi 3 and Pi 4, provisions the `kiosk`
-account, enables key-only SSH, embeds DHCP Ethernet and Wi-Fi profiles, includes
-the kiosk, and writes `dist/rahamin-kiosk-rpi3-rpi4.img` plus its compressed
+The builder downloads Raspberry Pi OS Desktop 32-bit, provisions the `kiosk`
+account, enables key-only SSH, embeds DHCP Ethernet plus both Wi-Fi profiles,
+includes the kiosk, and writes `dist/rahamin-kiosk-universal.img` plus its compressed
 `.xz` file. On first boot, a full-screen
 progress display reports every installation stage and automatic retry. After the
 reboot, the configuration screen displays the address to use from a phone or
@@ -143,6 +161,24 @@ For GitHub auto-updates, publish the repository and pass its clone URL:
 ```sh
 sudo KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git ./image/build-image.sh
 ```
+
+Installer choices are `KIOSK_PROFILE=auto` (recommended), `zero`, and `multi`.
+`auto` detects the board during first boot. A typical private
+`image/config.local.env` is:
+
+```sh
+WIFI_PRIMARY_SSID=Home
+WIFI_SECONDARY_SSID=Baiamonte
+WIFI_PSK=your-shared-password
+KIOSK_PROFILE=auto
+BAIAMONTE_TV_URL=https://YOUR-ID.ui.nabu.casa/lovelace/0
+KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
+```
+
+The current Baiamonte cloud host answers at `/lovelace/0`; its `/tv` route
+currently returns 404. If a `/tv` dashboard is later added to Home Assistant,
+set `BAIAMONTE_TV_URL` to that complete external URL without changing the image
+software.
 
 Wi-Fi credentials are read from the ignored `image/config.local.env`; see
 `image/config.example.env`. The generated image contains the Wi-Fi password, so

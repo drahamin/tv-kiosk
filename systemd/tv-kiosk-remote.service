@@ -1,6 +1,7 @@
 [Unit]
 Description=Rahamin Kiosk Samsung HDMI-CEC remote control
 After=graphical-session.target tv-kiosk-browser.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+requested=${KIOSK_PROFILE:-auto}
+case "$requested" in
+  zero|multi) printf '%s\n' "$requested"; exit 0 ;;
+  auto) ;;
+  *) echo "KIOSK_PROFILE must be auto, zero, or multi" >&2; exit 2 ;;
+esac
+
+model=${KIOSK_HARDWARE_MODEL:-}
+if [ -z "$model" ]; then
+  model=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
+fi
+case "$model" in
+  *"Raspberry Pi Zero"*) printf 'zero\n' ;;
+  *) printf 'multi\n' ;;
+esac
