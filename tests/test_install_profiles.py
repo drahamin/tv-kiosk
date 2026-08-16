@@ -39,6 +39,11 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("KIOSK_PROFILE", builder)
         self.assertIn("rahamin-kiosk-universal.img", builder)
 
+    def test_updates_detect_and_persist_missing_hardware_profile(self):
+        setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        self.assertIn('KIOSK_PROFILE=auto KIOSK_HARDWARE_MODEL="$HARDWARE_MODEL"', setup)
+        self.assertIn("KIOSK_HARDWARE_PROFILE=%s", setup)
+
 
 if __name__ == "__main__":
     unittest.main()
