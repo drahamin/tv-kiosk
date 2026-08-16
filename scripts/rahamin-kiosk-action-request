@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+REQUEST=/home/kiosk/.config/tv-kiosk/action-request
+[ -r "$REQUEST" ] || exit 0
+action=$(head -n 1 "$REQUEST")
+rm -f "$REQUEST"
+exec /usr/local/sbin/rahamin-kiosk-action "$action"

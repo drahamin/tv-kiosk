@@ -9,6 +9,16 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "app" / "server.py"
 
 
 class KioskServerTests(unittest.TestCase):
+    def test_web_service_keeps_privilege_isolation_for_admin_helpers(self):
+        service = (MODULE_PATH.parents[1] / "systemd" / "tv-kiosk-web.service").read_text()
+        self.assertIn("NoNewPrivileges=true", service)
+        self.assertIn("PrivateTmp=true", service)
+
+        source = MODULE_PATH.read_text()
+        self.assertIn("atomic_text_write(ACTION_REQUEST_PATH", source)
+        self.assertNotIn('subprocess.run(["sudo", "-n", str(helper), action]', source)
+        self.assertNotIn('subprocess.run(["sudo", "-n", "/usr/local/sbin/rahamin-kiosk-network"', source)
+
     def test_default_playlist_contains_both_weather_pages(self):
         default = json.loads((MODULE_PATH.parents[1] / "config" / "kiosk.json").read_text(encoding="utf-8"))
         weather = {page["name"]: page for page in default["pages"][3:]}

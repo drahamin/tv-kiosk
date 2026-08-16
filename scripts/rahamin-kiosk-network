@@ -129,6 +129,7 @@ def write_status(ok, message):
 def main():
     try:
         data = json.loads(REQUEST.read_text(encoding="utf-8"))
+        REQUEST.unlink(missing_ok=True)
         apply(data)
         write_status(True, "Network configuration applied")
     except Exception as exc:

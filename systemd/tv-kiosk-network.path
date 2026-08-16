@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for authenticated Rahamin Kiosk network changes
+
+[Path]
+PathExists=/home/kiosk/.config/tv-kiosk/network-request.json
+Unit=tv-kiosk-network.service
+
+[Install]
+WantedBy=multi-user.target

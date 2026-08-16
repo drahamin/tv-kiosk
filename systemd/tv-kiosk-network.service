@@ -1,0 +1,6 @@
+[Unit]
+Description=Apply authenticated Rahamin Kiosk network settings
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rahamin-kiosk-network

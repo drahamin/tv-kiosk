@@ -98,10 +98,14 @@ install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/openbox-auto
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-network" /usr/local/sbin/rahamin-kiosk-network
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cleanup" /usr/local/sbin/rahamin-kiosk-cleanup
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action" /usr/local/sbin/rahamin-kiosk-action
-printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/rahamin-kiosk-network\n' "$KIOSK_USER" > /etc/sudoers.d/90-rahamin-kiosk-network
-chmod 0440 /etc/sudoers.d/90-rahamin-kiosk-network
-printf '%s ALL=(root) NOPASSWD: /usr/local/sbin/rahamin-kiosk-action force-update, /usr/local/sbin/rahamin-kiosk-action reboot, /usr/local/sbin/rahamin-kiosk-action start-display, /usr/local/sbin/rahamin-kiosk-action stop-display\n' "$KIOSK_USER" > /etc/sudoers.d/91-rahamin-kiosk-action
-chmod 0440 /etc/sudoers.d/91-rahamin-kiosk-action
+install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action-request" /usr/local/sbin/rahamin-kiosk-action-request
+rm -f /etc/sudoers.d/90-rahamin-kiosk-network /etc/sudoers.d/91-rahamin-kiosk-action
+
+for unit in tv-kiosk-web.service tv-kiosk-update.service tv-kiosk-update.timer tv-kiosk-action.service tv-kiosk-action.path tv-kiosk-network.service tv-kiosk-network.path; do
+  install -m 0644 "$APP_DIR/systemd/$unit" "/etc/systemd/system/$unit"
+done
+systemctl daemon-reload
+systemctl enable --now tv-kiosk-update.timer tv-kiosk-action.path tv-kiosk-network.path >/dev/null
 
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user"
 BROWSER_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-browser.service"
@@ -137,7 +141,7 @@ ln -sf ../tv-kiosk-remote.service "/home/$KIOSK_USER/.config/systemd/user/defaul
 ln -sf ../tv-kiosk-audio.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-audio.service"
 ln -sf ../tv-kiosk-chime.service "/home/$KIOSK_USER/.config/systemd/user/default.target.wants/tv-kiosk-chime.service"
 
-# Commit helpers, sudo rules, and the browser unit to storage before any browser
+# Commit helpers, protected request units, and the browser unit to storage before any browser
 # load is started. This protects the installation if an undervoltage reset occurs.
 sync
 

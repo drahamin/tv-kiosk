@@ -27,6 +27,7 @@ CONFIG_PATH = Path(os.environ.get("KIOSK_CONFIG", STATE_DIR / "kiosk.json"))
 CREDENTIALS_PATH = Path(os.environ.get("KIOSK_CREDENTIALS", STATE_DIR / "admin.json"))
 NETWORK_REQUEST_PATH = STATE_DIR / "network-request.json"
 NETWORK_STATUS_PATH = STATE_DIR / "network-status.json"
+ACTION_REQUEST_PATH = STATE_DIR / "action-request"
 SESSION_TTL = 8 * 60 * 60
 PASSWORD_ROUNDS = 260_000
 MAX_PAGES = 5
@@ -40,6 +41,14 @@ def atomic_json_write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+
+
+def atomic_text_write(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(data, encoding="utf-8")
     os.chmod(temporary, 0o600)
     os.replace(temporary, path)
 
@@ -405,11 +414,6 @@ def validate_network_request(form):
     return data
 
 
-def apply_network_later():
-    time.sleep(2)
-    subprocess.run(["sudo", "-n", "/usr/local/sbin/rahamin-kiosk-network"], check=False, timeout=90)
-
-
 def page_shell(title, content):
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>
 :root{{--ink:#171f22;--navy:#101c24;--blue:#1c5366;--gold:#d3a94f;--teal:#3d7d7a;--paper:#fbfcfa;--line:#d8e0dd;--muted:#617075;--good:#2f7653;--danger:#9b3d35}}
@@ -627,11 +631,10 @@ class Handler(BaseHTTPRequestHandler):
                 config = save_config({"title": form.get("title", ""), "listen_port": form.get("listen_port", "8999"), "rotation_seconds": form.get("rotation_seconds", "45"), "transition_seconds": form.get("transition_seconds", "0.7"), "zoom_percent": form.get("zoom_percent", "100"), "audio_enabled": form.get("audio_enabled") == "on", "audio_volume": form.get("audio_volume", "60"), "show_status": form.get("show_status") == "on", "setup_complete": form.get("setup_complete") == "on", "background": form.get("background", "#080706"), "theme": form.get("theme", "rahamin"), "pages": [{"name": form.get(f"page_{i}_name", ""), "url": form.get(f"page_{i}_url", ""), "enabled": form.get(f"page_{i}_enabled") == "on"} for i in range(1, MAX_PAGES + 1)]})
                 self.reply(200, "text/html; charset=utf-8", admin_page(config, session, "Settings saved. The live playlist will reload automatically."))
             elif path == "/admin/network":
-                if not Path("/usr/local/sbin/rahamin-kiosk-network").exists():
-                    raise ValueError("The network helper is not installed yet; allow the GitHub updater to finish and try again")
+                if not Path("/etc/systemd/system/tv-kiosk-network.path").exists():
+                    raise ValueError("The protected network service is not installed yet; allow the GitHub updater to finish and try again")
                 request = validate_network_request(form)
                 atomic_json_write(NETWORK_REQUEST_PATH, request)
-                threading.Thread(target=apply_network_later, daemon=True).start()
                 self.reply(200, "text/html; charset=utf-8", admin_page(load_config(), session, "Network configuration accepted. It will apply in two seconds and this address may change."))
             elif path == "/admin/credentials":
                 change_credentials(form.get("current_password", ""), form.get("username", ""), form.get("password", ""), form.get("confirmation", ""))
@@ -643,12 +646,9 @@ class Handler(BaseHTTPRequestHandler):
                 action = form.get("action", "")
                 if action not in ("force-update", "reboot", "start-display", "stop-display"):
                     raise ValueError("Unknown system action")
-                helper = Path("/usr/local/sbin/rahamin-kiosk-action")
-                if not helper.exists():
-                    raise ValueError("The system action helper is not installed yet; allow the GitHub updater to finish and try again")
-                result = subprocess.run(["sudo", "-n", str(helper), action], capture_output=True, text=True, check=False, timeout=15)
-                if result.returncode:
-                    raise ValueError((result.stderr or result.stdout or "System action failed").strip())
+                if not Path("/etc/systemd/system/tv-kiosk-action.path").exists():
+                    raise ValueError("The protected system action service is not installed yet; allow the GitHub updater to finish and try again")
+                atomic_text_write(ACTION_REQUEST_PATH, action + "\n")
                 messages = {"force-update": "GitHub update started. Refresh status in about one minute.", "reboot": "Rahamin Kiosk is rebooting. The display and admin page will return automatically.", "start-display": "Display started.", "stop-display": "Display stopped and will remain off across reboots and updates."}
                 message = messages[action]
                 self.reply(200, "text/html; charset=utf-8", admin_page(load_config(), session, message))
