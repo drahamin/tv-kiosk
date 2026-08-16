@@ -15,7 +15,7 @@ on every Pi Zero and Pi Zero 2. That profile opens one full-screen Baiamonte
 dashboard, never rotates or reloads it on a timer, and keeps only one Chromium
 renderer on Pi Zero 2 or one ARMv6-compatible Cog renderer on the original Zero.
 The Pi Zero defaults to the VPN-local Baiamonte ADS-B TV display at
-`http://192.168.0.10:8998/tv`. Set `BAIAMONTE_TV_URL` during image
+`http://192.168.0.10:8101`. Set `BAIAMONTE_TV_URL` during image
 creation or edit Page 1 in Admin to change it.
 Pi 3, Pi 4, and Pi 5 continue to use the five-page profile.
 
@@ -172,7 +172,7 @@ WIFI_PRIMARY_SSID=Home
 WIFI_SECONDARY_SSID=Baiamonte
 WIFI_PSK=your-shared-password
 KIOSK_PROFILE=auto
-BAIAMONTE_TV_URL=http://192.168.0.10:8998/tv
+BAIAMONTE_TV_URL=http://192.168.0.10:8101
 KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
 ```
 

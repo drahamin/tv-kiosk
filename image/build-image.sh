@@ -21,7 +21,7 @@ fi
 : "${KIOSK_PORT:=8999}"
 : "${KIOSK_UPDATE_BRANCH:=main}"
 : "${KIOSK_PROFILE:=auto}"
-: "${BAIAMONTE_TV_URL:=http://192.168.0.10:8998/tv}"
+: "${BAIAMONTE_TV_URL:=http://192.168.0.10:8101}"
 : "${KIOSK_REPO_URL:=}"
 : "${RPI_OS_IMAGE_URL:=}"
 : "${SSH_PUBLIC_KEY_FILE:=$ROOT_DIR/image/kiosk_admin_ed25519.pub}"
