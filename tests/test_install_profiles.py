@@ -72,6 +72,13 @@ class InstallProfileTests(unittest.TestCase):
         self.assertEqual(updater.count('git merge --ff-only "$target"'), 1)
         self.assertLess(updater.index('git fetch --quiet origin "$BRANCH"'), updater.index('git merge --ff-only "$target"'))
 
+    def test_system_repair_unlocks_only_invalid_kiosk_accounts(self):
+        setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        self.assertIn('KIOSK_PASSWORD_STATE=$(passwd -S "$KIOSK_USER"', setup)
+        self.assertIn("L|LK|NP)", setup)
+        self.assertIn("/dev/urandom", setup)
+        self.assertIn("| chpasswd", setup)
+
     def test_profile_branding_and_hdmi_fallbacks_are_installed(self):
         boot = (ROOT / "session" / "boot.html").read_text(encoding="utf-8")
         browser = (ROOT / "scripts" / "browser-controller.py").read_text(encoding="utf-8")

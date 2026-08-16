@@ -19,6 +19,22 @@ if [ -z "${KIOSK_HARDWARE_PROFILE:-}" ]; then
   printf 'KIOSK_HARDWARE_PROFILE=%s\n' "$KIOSK_HARDWARE_PROFILE" >> /etc/tv-kiosk/kiosk.env
 fi
 
+# Current Raspberry Pi OS Lite releases do not always consume userconf.txt
+# before this root-owned first-boot installer runs. In that case useradd creates
+# the kiosk account with a locked shadow entry. LightDM may start the first
+# session, but SSH and later user services are rejected after reboot. Give only
+# locked/passwordless kiosk accounts a discarded random password. SSH password
+# authentication remains disabled; this merely makes key-only login and the
+# graphical service account valid across reboots and updates.
+KIOSK_PASSWORD_STATE=$(passwd -S "$KIOSK_USER" 2>/dev/null | awk '{print $2}')
+case "$KIOSK_PASSWORD_STATE" in
+  L|LK|NP)
+    KIOSK_RANDOM_PASSWORD=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+    printf '%s:%s\n' "$KIOSK_USER" "$KIOSK_RANDOM_PASSWORD" | chpasswd
+    unset KIOSK_RANDOM_PASSWORD
+    ;;
+esac
+
 if [ "$KIOSK_HARDWARE_PROFILE" = zero ]; then
   cat > /etc/default/zramswap <<'EOF'
 ALGO=zstd
