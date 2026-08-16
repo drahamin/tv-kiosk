@@ -29,8 +29,8 @@ cec_action() {
 send_action() {
   case "$1" in
     up|down) send_key "$1" ;;
-    previous_page) systemctl --user kill --signal=SIGUSR2 tv-kiosk-browser.service ;;
-    next_page) systemctl --user kill --signal=SIGUSR1 tv-kiosk-browser.service ;;
+    previous_page) systemctl --user kill --kill-whom=main --signal=SIGUSR2 tv-kiosk-browser.service ;;
+    next_page) systemctl --user kill --kill-whom=main --signal=SIGUSR1 tv-kiosk-browser.service ;;
     play_pause) send_key space ;;
     zoom_in) send_control_key plus ;;
     zoom_out) send_control_key minus ;;
