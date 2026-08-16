@@ -29,7 +29,9 @@ NETWORK_REQUEST_PATH = STATE_DIR / "network-request.json"
 NETWORK_STATUS_PATH = STATE_DIR / "network-status.json"
 ACTION_REQUEST_PATH = STATE_DIR / "action-request"
 SESSION_TTL = 8 * 60 * 60
-PASSWORD_ROUNDS = 260_000
+# The original ARMv6 Pi Zero takes well over 30 seconds at the multi-Pi value.
+# Keep the stronger value on Pi 3/4 and use a practical local-admin value on Zero.
+PASSWORD_ROUNDS = 40_000 if HARDWARE_PROFILE == "zero" else 260_000
 MAX_PAGES = 5
 ZOOM_LEVELS = (50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200)
 SESSIONS = {}
@@ -159,7 +161,13 @@ def load_credentials():
 def check_credentials(username, password):
     record = load_credentials()
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(record["salt"]), int(record["rounds"])).hex()
-    return hmac.compare_digest(username, record["username"]) and hmac.compare_digest(digest, record["password_hash"])
+    valid = hmac.compare_digest(username, record["username"]) and hmac.compare_digest(digest, record["password_hash"])
+    # Transparently resize existing credentials after the next successful sign-in.
+    # The username and password remain unchanged.
+    if valid and int(record["rounds"]) != PASSWORD_ROUNDS:
+        with FILE_LOCK:
+            atomic_json_write(CREDENTIALS_PATH, password_record(record["username"], password))
+    return valid
 
 
 def change_credentials(current_password, username, password, confirmation):
@@ -349,35 +357,78 @@ def network_device(connection_type, fallback):
 
 
 def network_configuration():
-    wifi = connection_name(network_device("wifi", "wlan0"), "802-11-wireless")
-    ethernet = connection_name(network_device("ethernet", "eth0"), "802-3-ethernet")
-    wifi_security = nm_value(wifi, "802-11-wireless-security.key-mgmt")
+    devices = run_command(["nmcli", "-t", "-f", "DEVICE,TYPE,CONNECTION", "device", "status"])
+    connections = run_command(["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"])
+
+    def active_connection(kind, fallback_kind):
+        for line in devices.splitlines():
+            parts = line.split(":", 2)
+            if len(parts) == 3 and parts[1] == kind and parts[2] and parts[2] != "--":
+                return parts[2]
+        for line in connections.splitlines():
+            name, _, connection_kind = line.partition(":")
+            if connection_kind == fallback_kind:
+                return name
+        return ""
+
+    def properties(connection):
+        values = {}
+        if connection:
+            for line in run_command(["nmcli", "-t", "connection", "show", connection]).splitlines():
+                key, separator, value = line.partition(":")
+                if separator:
+                    values[key] = value
+        return values
+
+    wifi_values = properties(active_connection("wifi", "802-11-wireless"))
+    ethernet_values = properties(active_connection("ethernet", "802-3-ethernet"))
+    wifi_security = wifi_values.get("802-11-wireless-security.key-mgmt", "")
+
+    def value(values, field, default=""):
+        return values.get(field, default)
+
     return {
         "hostname": socket.gethostname(),
         "wifi_enabled": run_command(["nmcli", "radio", "wifi"]) == "enabled",
-        "wifi_autoconnect": nm_value(wifi, "connection.autoconnect") != "no",
-        "wifi_ssid": nm_value(wifi, "802-11-wireless.ssid"),
+        "wifi_autoconnect": value(wifi_values, "connection.autoconnect") != "no",
+        "wifi_ssid": value(wifi_values, "802-11-wireless.ssid"),
         "wifi_password": "",
         "wifi_security": "open" if not wifi_security else "wpa-psk",
-        "wifi_mac_policy": nm_value(wifi, "802-11-wireless.cloned-mac-address") or "preserve",
-        "wifi_ipv4_mode": nm_value(wifi, "ipv4.method") or "auto",
-        "wifi_ipv4_address": nm_value(wifi, "ipv4.addresses"),
-        "wifi_ipv4_gateway": nm_value(wifi, "ipv4.gateway"),
-        "wifi_ipv4_dns": nm_value(wifi, "ipv4.dns").replace(";", ","),
-        "wifi_ipv6_mode": nm_value(wifi, "ipv6.method") or "auto",
-        "wifi_ipv6_address": nm_value(wifi, "ipv6.addresses"),
-        "wifi_ipv6_gateway": nm_value(wifi, "ipv6.gateway"),
-        "wifi_ipv6_dns": nm_value(wifi, "ipv6.dns").replace(";", ","),
-        "ethernet_enabled": nm_value(ethernet, "connection.autoconnect") != "no",
-        "ethernet_ipv4_mode": nm_value(ethernet, "ipv4.method") or "auto",
-        "ethernet_ipv4_address": nm_value(ethernet, "ipv4.addresses"),
-        "ethernet_ipv4_gateway": nm_value(ethernet, "ipv4.gateway"),
-        "ethernet_ipv4_dns": nm_value(ethernet, "ipv4.dns").replace(";", ","),
-        "ethernet_ipv6_mode": nm_value(ethernet, "ipv6.method") or "auto",
-        "ethernet_ipv6_address": nm_value(ethernet, "ipv6.addresses"),
-        "ethernet_ipv6_gateway": nm_value(ethernet, "ipv6.gateway"),
-        "ethernet_ipv6_dns": nm_value(ethernet, "ipv6.dns").replace(";", ","),
+        "wifi_mac_policy": value(wifi_values, "802-11-wireless.cloned-mac-address") or "preserve",
+        "wifi_ipv4_mode": value(wifi_values, "ipv4.method") or "auto",
+        "wifi_ipv4_address": value(wifi_values, "ipv4.addresses"),
+        "wifi_ipv4_gateway": value(wifi_values, "ipv4.gateway"),
+        "wifi_ipv4_dns": value(wifi_values, "ipv4.dns").replace(";", ","),
+        "wifi_ipv6_mode": value(wifi_values, "ipv6.method") or "auto",
+        "wifi_ipv6_address": value(wifi_values, "ipv6.addresses"),
+        "wifi_ipv6_gateway": value(wifi_values, "ipv6.gateway"),
+        "wifi_ipv6_dns": value(wifi_values, "ipv6.dns").replace(";", ","),
+        "ethernet_enabled": value(ethernet_values, "connection.autoconnect") != "no",
+        "ethernet_ipv4_mode": value(ethernet_values, "ipv4.method") or "auto",
+        "ethernet_ipv4_address": value(ethernet_values, "ipv4.addresses"),
+        "ethernet_ipv4_gateway": value(ethernet_values, "ipv4.gateway"),
+        "ethernet_ipv4_dns": value(ethernet_values, "ipv4.dns").replace(";", ","),
+        "ethernet_ipv6_mode": value(ethernet_values, "ipv6.method") or "auto",
+        "ethernet_ipv6_address": value(ethernet_values, "ipv6.addresses"),
+        "ethernet_ipv6_gateway": value(ethernet_values, "ipv6.gateway"),
+        "ethernet_ipv6_dns": value(ethernet_values, "ipv6.dns").replace(";", ","),
     }
+
+
+def send_tv_keyboard(text="", key=""):
+    if len(text) > 256:
+        raise ValueError("TV keyboard text is limited to 256 characters")
+    allowed_keys = {"tab": "TAB", "enter": "RETURN", "escape": "ESC", "backspace": "BACKSPACE", "left": "LEFT", "right": "RIGHT", "up": "UP", "down": "DOWN"}
+    environment = os.environ.copy()
+    environment.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    environment.setdefault("WAYLAND_DISPLAY", "wayland-0")
+    if text:
+        subprocess.run(["wtype", text], check=True, timeout=5, env=environment)
+    elif key in allowed_keys:
+        name = allowed_keys[key]
+        subprocess.run(["wtype", "-P", name, "-p", name], check=True, timeout=5, env=environment)
+    else:
+        raise ValueError("Unknown TV keyboard command")
 
 
 def validate_network_request(form):
@@ -483,11 +534,14 @@ def admin_page(config, session, message="", error=False, snapshot=None):
     if HARDWARE_PROFILE == "zero":
         timing_fields = f'<input type="hidden" name="rotation_seconds" value="{config["rotation_seconds"]}"><input type="hidden" name="transition_seconds" value="{config["transition_seconds"]}"><p class="note wide">Single-page mode does not rotate or periodically reload the cloud dashboard.</p>'
         setup_label = "Setup complete — show the Baiamonte dashboard"
+        tv_keyboard = f'''<section class="card"><div class="card-head"><span class="eyebrow">NO PHYSICAL KEYBOARD NEEDED</span><h2>TV keyboard</h2></div><div class="body"><p class="note">Use this when the TV asks you to sign in. Press Tab to move between fields, type below, then send it to the TV. Rahamin Kiosk does not save this text.</p><div class="grid"><label class="wide">Text to type on TV<input id="tv-keyboard-text" type="password" autocomplete="off" placeholder="email, username, or password"></label></div><div class="actions"><button type="button" class="secondary tv-key" data-key="tab">Tab</button><button type="button" class="secondary tv-key" data-key="backspace">Backspace</button><button type="button" class="secondary tv-key" data-key="escape">Escape</button><button type="button" class="gold" id="tv-send-text">Send text</button><button type="button" id="tv-enter">Enter</button><span class="note" id="tv-keyboard-result"></span></div></div></section>'''
     else:
         timing_fields = f'<label>Rotation time (seconds)<input type="number" min="5" max="3600" name="rotation_seconds" value="{config["rotation_seconds"]}" required></label><label>Transition time (seconds)<input type="number" min="0" max="5" step="0.1" name="transition_seconds" value="{config["transition_seconds"]}" required></label>'
         setup_label = "Setup complete — show the rotating pages"
+        tv_keyboard = ""
     content = f"""<main><section class="hero"><span class="eyebrow">SAMSUNG 75-INCH DISPLAY</span><h1>Rahamin Kiosk control center</h1><p>Manage the playlist, test every source, review the Pi and network, and keep the display healthy.</p></section>{notice}
 <section class="card"><div class="card-head"><span class="eyebrow">LIVE OPERATIONS</span><h2>Kiosk status</h2></div><div class="body"><div class="stats" id="operations-stats">{operations}</div><div class="actions"><span class="note" id="status-time">Updated {html.escape(snapshot['timestamp'])}</span><button class="secondary" type="button" id="refresh-status">Refresh status</button><form method="post" action="/admin/action"><input type="hidden" name="csrf" value="{session['csrf']}"><input type="hidden" name="action" value="start-display"><button type="submit">Start display</button></form><form method="post" action="/admin/action"><input type="hidden" name="csrf" value="{session['csrf']}"><input type="hidden" name="action" value="stop-display"><button class="secondary" type="submit">Stop display</button></form><form method="post" action="/admin/restart-display"><input type="hidden" name="csrf" value="{session['csrf']}"><button type="submit">Restart display</button></form><form method="post" action="/admin/action"><input type="hidden" name="csrf" value="{session['csrf']}"><input type="hidden" name="action" value="force-update"><button class="gold" type="submit">Force update now</button></form><form method="post" action="/admin/action" onsubmit="return confirm('Reboot Rahamin Kiosk now?')"><input type="hidden" name="csrf" value="{session['csrf']}"><input type="hidden" name="action" value="reboot"><button class="danger" type="submit">Reboot Pi</button></form></div></div></section>
+{tv_keyboard}
 <section class="card"><div class="card-head"><span class="eyebrow">HARDWARE</span><h2>Raspberry Pi health</h2></div><div class="body"><div class="stats" id="hardware-stats">{hardware}</div></div></section>
 <section class="card"><div class="card-head"><span class="eyebrow">NETWORK STATUS</span><h2>Current connection</h2></div><div class="body"><div class="stats" id="network-stats">{network}</div></div></section>
 <section class="card"><div class="card-head"><span class="eyebrow">NETWORK CONFIGURATION</span><h2>Wi-Fi, Ethernet, IPv4, IPv6, DNS, and hostname</h2></div><div class="body">{network_form}</div></section>
@@ -497,6 +551,10 @@ def admin_page(config, session, message="", error=False, snapshot=None):
 <section class="card"><div class="card-head"><span class="eyebrow">SECURITY</span><h2>Administrator login</h2></div><div class="body"><form class="grid" method="post" action="/admin/credentials"><input type="hidden" name="csrf" value="{session['csrf']}"><label>New username<input name="username" value="{html.escape(session['username'], quote=True)}" required></label><label>Current password<input type="password" name="current_password" required></label><label>New password<input type="password" name="password" required></label><label>Confirm new password<input type="password" name="confirmation" required></label><div class="actions wide"><button type="submit">Change administrator login</button></div></form></div></section><footer>Rahamin Kiosk • Settings and password changes persist across GitHub updates</footer></main>
 <script>
 const csrf={json.dumps(session['csrf'])};
+async function tvKeyboard(payload){{const result=document.getElementById('tv-keyboard-result');if(!result)return;result.textContent='Sending…';try{{const response=await fetch('/admin/keyboard',{{method:'POST',headers:{{'Content-Type':'application/x-www-form-urlencoded'}},body:new URLSearchParams({{csrf,...payload}})}});result.textContent=response.ok?'Sent to TV':'Could not send';}}catch(error){{result.textContent='Could not send';}}}}
+document.querySelectorAll('.tv-key').forEach(button=>button.addEventListener('click',()=>tvKeyboard({{key:button.dataset.key}})));
+document.getElementById('tv-enter')?.addEventListener('click',()=>tvKeyboard({{key:'enter'}}));
+document.getElementById('tv-send-text')?.addEventListener('click',()=>{{const input=document.getElementById('tv-keyboard-text');if(input.value){{tvKeyboard({{text:input.value}});input.value='';}}}});
 document.querySelectorAll('.test-page').forEach(button=>button.addEventListener('click',async()=>{{const target=document.getElementById('test-'+button.dataset.index);target.textContent='Checking…';try{{const response=await fetch('/admin/test-page?index='+button.dataset.index);const result=await response.json();target.textContent=(result.ok?'✓ ':'✕ ')+(result.status||result.message)+' · '+result.latency_ms+'ms';target.className='test-result '+(result.ok?'status-good':'status-bad')}}catch(error){{target.textContent='Test failed';target.className='test-result status-bad'}}}}));
 document.getElementById('refresh-status').addEventListener('click',async()=>{{const response=await fetch('/admin/status');const status=await response.json();Object.entries(status).forEach(([key,value])=>{{const node=document.querySelector('[data-status="'+key+'"] b');if(node)node.textContent=value}});document.getElementById('status-time').textContent='Updated '+status.timestamp;}});
 </script>"""
@@ -646,7 +704,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.redirect("/admin/login")
             elif path == "/admin/restart-display":
                 subprocess.run(["pkill", "-x", "chromium"], check=False)
-                self.reply(200, "text/html; charset=utf-8", admin_page(load_config(), session, "Display restart requested. Chromium will return automatically."))
+                subprocess.run(["pkill", "-x", "cog"], check=False)
+                self.reply(200, "text/html; charset=utf-8", admin_page(load_config(), session, "Display restart requested. The kiosk browser will return automatically."))
+            elif path == "/admin/keyboard":
+                if HARDWARE_PROFILE != "zero":
+                    raise ValueError("TV keyboard is only needed on the Pi Zero profile")
+                send_tv_keyboard(form.get("text", ""), form.get("key", ""))
+                self.reply(204, "text/plain; charset=utf-8", "")
             elif path == "/admin/action":
                 action = form.get("action", "")
                 if action not in ("force-update", "reboot", "start-display", "stop-display"):
