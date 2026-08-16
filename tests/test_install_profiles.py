@@ -80,10 +80,12 @@ class InstallProfileTests(unittest.TestCase):
     def test_installer_uses_matching_lightweight_wayland_session(self):
         installer = (ROOT / "install.sh").read_text(encoding="utf-8")
         updater = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
-        self.assertIn("avahi-daemon cec-utils chromium git labwc lightdm", installer)
+        self.assertIn("avahi-daemon cec-utils git labwc lightdm", installer)
         self.assertIn("autologin-session=labwc", installer)
         self.assertIn("autologin-session=labwc", updater)
         self.assertNotIn("autologin-session=openbox", installer)
+        self.assertIn("cog zram-tools", installer)
+        self.assertIn("BROWSER_PACKAGE=cog", updater)
 
 
 if __name__ == "__main__":

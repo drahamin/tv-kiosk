@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Chromium in kiosk mode and rotate full browser tabs from kiosk.json."""
+"""Run the hardware-appropriate full-screen browser from kiosk.json."""
 
 import json
 import os
@@ -18,6 +18,7 @@ CONFIG_PATH = Path(os.environ.get("KIOSK_CONFIG", STATE_DIR / "kiosk.json"))
 DEFAULT_CONFIG = ROOT / "config" / "kiosk.json"
 DEBUG_PORT = int(os.environ.get("KIOSK_DEBUG_PORT", "9222"))
 CHROMIUM = os.environ.get("KIOSK_CHROMIUM", "chromium")
+COG = os.environ.get("KIOSK_COG", "cog")
 HARDWARE_PROFILE = os.environ.get("KIOSK_HARDWARE_PROFILE", "multi").strip().lower()
 running = True
 requested_step = 0
@@ -173,8 +174,46 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None)
     return subprocess.Popen(command)
 
 
+def launch_cog(url):
+    environment = os.environ.copy()
+    environment["COG_PLATFORM_WL_VIEW_FULLSCREEN"] = "1"
+    environment["COG_PLATFORM_WL_VIEW_MAXIMIZE"] = "1"
+    return subprocess.Popen([COG, "--platform=wl", url], env=environment)
+
+
+def supervise_cog():
+    """Keep one low-memory WebKit view alive on original ARMv6 Pi Zero boards."""
+    while running:
+        config = load_config()
+        configure_audio(config)
+        fingerprint = json.dumps(config, sort_keys=True)
+        process = launch_cog(config["pages"][0]["url"])
+        print(f"Loaded Pi Zero kiosk page: {config['pages'][0]['name']}", flush=True)
+        try:
+            while running and process.poll() is None:
+                updated = load_config()
+                if json.dumps(updated, sort_keys=True) != fingerprint:
+                    print("Pi Zero page, zoom, or audio settings changed; restarting Cog", flush=True)
+                    break
+                time.sleep(2)
+        except Exception as exc:
+            print(f"Pi Zero Cog controller: {exc}", flush=True)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+        if running:
+            time.sleep(3)
+
+
 def supervise():
     global requested_step
+    if HARDWARE_PROFILE == "zero":
+        supervise_cog()
+        return
     while running:
         launch_config = load_config()
         configure_audio(launch_config)

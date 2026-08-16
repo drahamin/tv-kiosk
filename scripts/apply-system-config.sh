@@ -76,9 +76,15 @@ EOF
 EOF
 fi
 
-if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1; then
+BROWSER_PACKAGE=
+if [ "$KIOSK_HARDWARE_PROFILE" = zero ] && ! command -v cog >/dev/null 2>&1; then
+  BROWSER_PACKAGE=cog
+elif [ "$KIOSK_HARDWARE_PROFILE" != zero ] && ! command -v chromium >/dev/null 2>&1; then
+  BROWSER_PACKAGE=chromium
+fi
+if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || [ -n "$BROWSER_PACKAGE" ]; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc wtype
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc wtype $BROWSER_PACKAGE
 fi
 
 # Older builds selected Openbox even though the optimized Chromium and CEC

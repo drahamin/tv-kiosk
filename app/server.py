@@ -231,6 +231,11 @@ def read_meminfo():
 
 
 def current_browser_page():
+    if HARDWARE_PROFILE == "zero":
+        try:
+            return active_pages(load_config())[0]["name"]
+        except (OSError, ValueError, IndexError, json.JSONDecodeError):
+            return "Not available"
     try:
         with urlopen("http://127.0.0.1:9222/json/list", timeout=2) as response:
             targets = json.load(response)

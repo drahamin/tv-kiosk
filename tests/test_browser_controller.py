@@ -54,6 +54,15 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--js-flags=--max-old-space-size=192", command)
         self.assertTrue(command[-1].endswith("/session/boot.html?profile=zero"))
 
+    def test_pi_zero_uses_armv6_compatible_fullscreen_cog(self):
+        fake = MagicMock()
+        with patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+            self.assertIs(controller.launch_cog("https://cloud.example/tv"), fake)
+        command = popen.call_args.args[0]
+        environment = popen.call_args.kwargs["env"]
+        self.assertEqual(command, ["cog", "--platform=wl", "https://cloud.example/tv"])
+        self.assertEqual(environment["COG_PLATFORM_WL_VIEW_FULLSCREEN"], "1")
+
     def test_load_config_filters_disabled_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "kiosk.json"

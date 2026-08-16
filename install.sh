@@ -25,9 +25,11 @@ if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
   apt-get update
 fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  avahi-daemon cec-utils chromium git labwc lightdm network-manager openssh-server pipewire pipewire-pulse python3 wireplumber wtype
+  avahi-daemon cec-utils git labwc lightdm network-manager openssh-server pipewire pipewire-pulse python3 wireplumber wtype
 if [ "$HARDWARE_PROFILE" = zero ]; then
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends zram-tools
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cog zram-tools
+else
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium
 fi
 
 if ! id "$KIOSK_USER" >/dev/null 2>&1; then
