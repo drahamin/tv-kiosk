@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+# The Raspberry Pi image and updater can both request zram during the same
+# boot. Treat an already-active device as success instead of showing a false
+# failed-service message while useful compressed swap is running.
+if awk '$1 == "/dev/zram0" { found=1 } END { exit !found }' /proc/swaps; then
+  exit 0
+fi
+
+exec /usr/sbin/zramswap start

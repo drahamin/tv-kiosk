@@ -28,7 +28,7 @@ class InstallProfileTests(unittest.TestCase):
         config = json.loads((ROOT / "config" / "kiosk-zero.json").read_text(encoding="utf-8"))
         self.assertTrue(config["setup_complete"])
         self.assertEqual(len(config["pages"]), 1)
-        self.assertTrue(config["pages"][0]["url"].endswith("/tv"))
+        self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8123/lovelace/0")
 
     def test_universal_image_contains_dual_wifi_and_profile_settings(self):
         builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
@@ -86,6 +86,13 @@ class InstallProfileTests(unittest.TestCase):
         self.assertNotIn("autologin-session=openbox", installer)
         self.assertIn("cog zram-tools", installer)
         self.assertIn("BROWSER_PACKAGE=cog", updater)
+
+    def test_zero_swap_and_cloud_boot_are_idempotent(self):
+        setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        zram = (ROOT / "scripts" / "rahamin-zramswap").read_text(encoding="utf-8")
+        self.assertIn("/proc/swaps", zram)
+        self.assertIn("ExecStart=/usr/local/sbin/rahamin-zramswap", setup)
+        self.assertIn("/etc/cloud/cloud-init.disabled", setup)
 
 
 if __name__ == "__main__":

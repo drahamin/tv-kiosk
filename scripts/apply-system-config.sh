@@ -31,10 +31,24 @@ vm.vfs_cache_pressure=100
 vm.dirty_background_ratio=5
 vm.dirty_ratio=15
 EOF
+  install -m 0755 "$APP_DIR/scripts/rahamin-zramswap" /usr/local/sbin/rahamin-zramswap
+  install -d -m 0755 /etc/systemd/system/zramswap.service.d
+  cat > /etc/systemd/system/zramswap.service.d/rahamin-kiosk.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/local/sbin/rahamin-zramswap
+EOF
+  systemctl daemon-reload
+  systemctl reset-failed zramswap.service >/dev/null 2>&1 || true
   systemctl enable --now zramswap.service >/dev/null 2>&1 || true
   systemctl disable --now dphys-swapfile.service >/dev/null 2>&1 || true
 
 fi
+
+# The completed kiosk installation no longer needs cloud-init. Disabling its
+# generator removes the cloud-final ordering cycle and boot-screen warning.
+install -d -m 0755 /etc/cloud
+touch /etc/cloud/cloud-init.disabled
 
 # Keep a known, recoverable maintenance key on every kiosk. This also repairs
 # early images that were provisioned with a public key whose private half was
