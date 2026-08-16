@@ -10,23 +10,32 @@ send_control_key() {
   wtype -M ctrl -P "$1" -p "$1" -m ctrl
 }
 
-handle_cec_line() {
-  line=$1
-  case "$line" in
-    *"key pressed: up "*) send_key up ;;
-    *"key pressed: down "*) send_key down ;;
-    *"key pressed: left "*) send_key left ;;
-    *"key pressed: right "*) send_key right ;;
-    *"key pressed: select "*) send_key Return ;;
-    *"key pressed: page up "*) send_key Page_Up ;;
-    *"key pressed: page down "*) send_key Page_Down ;;
-    *"key pressed: play "*|*"key pressed: pause "*|*"key pressed: play/pause "*) send_key space ;;
-    *"key pressed: fast forward "*|*"key pressed: forward "*) send_control_key plus ;;
-    *"key pressed: rewind "*|*"key pressed: backward "*) send_control_key minus ;;
-    *"key pressed: stop "*) send_control_key 0 ;;
-    *"key pressed: channel up "*) send_control_key plus ;;
-    *"key pressed: channel down "*) send_control_key minus ;;
-    *"key pressed: number0 "*|*"key pressed: 0 "*) send_control_key 0 ;;
+cec_action() {
+  case "$1" in
+    *"key pressed: up"*) echo up ;;
+    *"key pressed: down"*) echo down ;;
+    *"key pressed: left"*) echo left ;;
+    *"key pressed: right"*) echo right ;;
+    *"key pressed: select"*|*"key pressed: enter"*) echo select ;;
+    *"key pressed: page up"*) echo page_up ;;
+    *"key pressed: page down"*) echo page_down ;;
+    *"key pressed: play/pause"*|*"key pressed: play"*|*"key pressed: pause"*) echo play_pause ;;
+    *"key pressed: fast forward"*|*"key pressed: forward"*|*"key pressed: channel up"*) echo zoom_in ;;
+    *"key pressed: rewind"*|*"key pressed: backward"*|*"key pressed: channel down"*) echo zoom_out ;;
+    *"key pressed: stop"*|*"key pressed: number0"*|*"key pressed: 0"*) echo zoom_reset ;;
+  esac
+}
+
+send_action() {
+  case "$1" in
+    up|down|left|right) send_key "$1" ;;
+    select) send_key Return ;;
+    page_up) send_key Page_Up ;;
+    page_down) send_key Page_Down ;;
+    play_pause) send_key space ;;
+    zoom_in) send_control_key plus ;;
+    zoom_out) send_control_key minus ;;
+    zoom_reset) send_control_key 0 ;;
   esac
 }
 
@@ -36,9 +45,20 @@ while :; do
   # remote presses to the Pi. Debug events are required for "key pressed".
   printf 'as\n' | cec-client -t p -d 31 -o "Rahamin Kiosk" 2>&1 | while IFS= read -r line; do
     case "$line" in
-      # libCEC reports a detailed state line and a canonical event line for
-      # every press. Handle only the latter so one remote press means one key.
-      *"key pressed:"*", 0)"*) echo "$line"; handle_cec_line "$line" ;;
+      # libCEC 6 and 7 format key events differently. Accept both forms and
+      # suppress the duplicate detail/canonical pair emitted for each press.
+      *"key pressed:"*)
+        action=$(cec_action "$line")
+        [ -n "$action" ] || continue
+        now_ms=$(date +%s%3N)
+        if [ "${last_action:-}" = "$action" ] && [ $((now_ms - ${last_action_ms:-0})) -lt 350 ]; then
+          continue
+        fi
+        last_action=$action
+        last_action_ms=$now_ms
+        echo "$line"
+        send_action "$action"
+        ;;
     esac
   done
   echo "HDMI-CEC listener stopped; retrying in 3 seconds" >&2
