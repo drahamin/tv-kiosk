@@ -418,7 +418,7 @@ def network_configuration():
 def send_tv_keyboard(text="", key=""):
     if len(text) > 256:
         raise ValueError("TV keyboard text is limited to 256 characters")
-    allowed_keys = {"tab": "TAB", "enter": "RETURN", "escape": "ESC", "backspace": "BACKSPACE", "left": "LEFT", "right": "RIGHT", "up": "UP", "down": "DOWN"}
+    allowed_keys = {"tab": "Tab", "enter": "Return", "escape": "Escape", "backspace": "BackSpace", "left": "Left", "right": "Right", "up": "Up", "down": "Down"}
     environment = os.environ.copy()
     environment.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
     environment.setdefault("WAYLAND_DISPLAY", "wayland-0")
