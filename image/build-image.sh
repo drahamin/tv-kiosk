@@ -193,6 +193,10 @@ ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-us
 # This image is fully provisioned and must remain keyboard-free.
 rm -f "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/userconfig.service"
 ln -sf /dev/null "$WORK_DIR/root/etc/systemd/system/userconfig.service"
+# The installer owns tty1 during first boot. Masking getty avoids both screen
+# contention and the ordering cycle caused by placing a multi-user service
+# before getty.target.
+ln -sf /dev/null "$WORK_DIR/root/etc/systemd/system/getty@tty1.service"
 
 if [[ -e "$WORK_DIR/root/lib/systemd/system/ssh.service" ]]; then
   ln -sf /lib/systemd/system/ssh.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/ssh.service"

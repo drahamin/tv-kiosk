@@ -66,9 +66,14 @@ class InstallProfileTests(unittest.TestCase):
     def test_firstboot_explicitly_tries_both_wifi_profiles_without_wizard(self):
         firstboot = (ROOT / "image" / "tv-kiosk-firstboot").read_text(encoding="utf-8")
         unit = (ROOT / "image" / "tv-kiosk-firstboot.service").read_text(encoding="utf-8")
+        builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
         self.assertIn('"$WIFI_PRIMARY_SSID" "$WIFI_SECONDARY_SSID"', firstboot)
         self.assertIn('connection up "Rahamin WiFi $wifi_ssid"', firstboot)
         self.assertNotIn("userconfig.service", unit)
+        self.assertNotIn("cloud-final.service", unit)
+        self.assertNotIn("Before=", unit)
+        self.assertNotIn("Conflicts=", unit)
+        self.assertIn('getty@tty1.service"', builder)
 
 
 if __name__ == "__main__":
