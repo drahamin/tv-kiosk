@@ -42,6 +42,7 @@ class RemoteControlTests(unittest.TestCase):
     def test_successful_updates_restart_remote_listener(self):
         updater = (ROOT / "scripts" / "update-kiosk.sh").read_text(encoding="utf-8")
         self.assertIn("try-restart tv-kiosk-remote.service", updater)
+        self.assertIn("systemctl --no-block --user try-restart tv-kiosk-remote.service", updater)
 
 
 if __name__ == "__main__":

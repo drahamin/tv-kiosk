@@ -42,9 +42,9 @@ fi
 systemctl restart tv-kiosk-web.service
 KIOSK_UID=$(id -u kiosk)
 if [ -S "/run/user/$KIOSK_UID/bus" ]; then
-  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user try-restart tv-kiosk-browser.service || true
-  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user try-restart tv-kiosk-remote.service || true
+  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user try-restart tv-kiosk-browser.service || true
+  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user try-restart tv-kiosk-remote.service || true
   # Audible confirmation is reserved for a real installed update, not the
   # routine timer checks that find no new commit.
-  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-chime.service || true
+  runuser -u kiosk -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user restart tv-kiosk-chime.service || true
 fi

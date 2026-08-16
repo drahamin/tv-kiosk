@@ -159,7 +159,7 @@ pkill -u "$KIOSK_USER" -x wf-panel-pi 2>/dev/null || true
 if [ -S "/run/user/$KIOSK_UID/bus" ]; then
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user daemon-reload || true
   if [ -e "$DISPLAY_DISABLED" ]; then
-    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user disable --now tv-kiosk-browser.service || true
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user disable --now tv-kiosk-browser.service || true
   else
     runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-browser.service || true
   fi
@@ -169,16 +169,16 @@ if [ -S "/run/user/$KIOSK_UID/bus" ]; then
     BROWSER_CHANGED=true
   fi
   if [ "$BROWSER_CHANGED" = true ] && [ ! -e "$DISPLAY_DISABLED" ]; then
-    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-browser.service || true
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user restart tv-kiosk-browser.service || true
   fi
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-remote.service || true
   if [ "$REMOTE_CHANGED" = true ] || ! pgrep -u "$KIOSK_USER" -f "$APP_DIR/scripts/rahamin-kiosk-remote" >/dev/null 2>&1; then
-    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-remote.service || true
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user restart tv-kiosk-remote.service || true
   fi
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-audio.service || true
   runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user enable tv-kiosk-chime.service || true
   if [ "$AUDIO_CHANGED" = true ] || ! runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user is-active --quiet tv-kiosk-audio.service; then
-    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --user restart tv-kiosk-audio.service || true
+    runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$KIOSK_UID" systemctl --no-block --user restart tv-kiosk-audio.service || true
   fi
 fi
 
