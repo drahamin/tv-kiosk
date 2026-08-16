@@ -2,16 +2,19 @@
 Description=Rahamin Kiosk full-screen browser controller
 After=graphical-session.target tv-kiosk-audio.service
 Wants=tv-kiosk-audio.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 Environment=XDG_RUNTIME_DIR=%t
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=%t/bus
+EnvironmentFile=-/etc/tv-kiosk/kiosk.env
 ExecStartPre=/bin/sh -c 'while [ ! -S "%t/wayland-0" ]; do sleep 1; done'
 ExecStart=/usr/bin/python3 /opt/tv-kiosk/scripts/browser-controller.py
 Restart=always
-RestartSec=3
+RestartSec=2
+OOMScoreAdjust=-250
 
 [Install]
 WantedBy=default.target

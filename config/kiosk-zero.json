@@ -1,0 +1,20 @@
+{
+  "title": "Baiamonte TV",
+  "listen_port": 8999,
+  "rotation_seconds": 3600,
+  "transition_seconds": 0,
+  "zoom_percent": 100,
+  "audio_enabled": true,
+  "audio_volume": 60,
+  "show_status": false,
+  "background": "#050706",
+  "theme": "rahamin",
+  "setup_complete": true,
+  "pages": [
+    {
+      "name": "Baiamonte TV Dashboard",
+      "url": "http://rahamin-adsb.local:8998/tv",
+      "enabled": true
+    }
+  ]
+}

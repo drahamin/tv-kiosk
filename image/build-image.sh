@@ -14,11 +14,14 @@ if [[ -f "$LOCAL_CONFIG" ]]; then
   set +a
 fi
 
-: "${WIFI_SSID:=Home}"
+: "${WIFI_PRIMARY_SSID:=${WIFI_SSID:-Home}}"
+: "${WIFI_SECONDARY_SSID:=Baiamonte}"
 : "${WIFI_PSK:?Set WIFI_PSK in image/config.local.env}"
 : "${WIFI_COUNTRY:=US}"
 : "${KIOSK_PORT:=8999}"
 : "${KIOSK_UPDATE_BRANCH:=main}"
+: "${KIOSK_PROFILE:=auto}"
+: "${BAIAMONTE_TV_URL:=http://rahamin-adsb.local:8998/tv}"
 : "${KIOSK_REPO_URL:=}"
 : "${RPI_OS_IMAGE_URL:=}"
 : "${SSH_PUBLIC_KEY_FILE:=$ROOT_DIR/image/kiosk_admin_ed25519.pub}"
@@ -28,6 +31,7 @@ if [[ "$SSH_PUBLIC_KEY_FILE" != /* ]]; then
 fi
 [[ -s "$SSH_PUBLIC_KEY_FILE" ]] || { echo "Missing SSH public key: $SSH_PUBLIC_KEY_FILE" >&2; exit 1; }
 [[ "$WIFI_COUNTRY" =~ ^[A-Z]{2}$ ]] || { echo "WIFI_COUNTRY must be a two-letter uppercase country code" >&2; exit 1; }
+[[ "$KIOSK_PROFILE" =~ ^(auto|zero|multi)$ ]] || { echo "KIOSK_PROFILE must be auto, zero, or multi" >&2; exit 1; }
 
 for command in curl losetup mcopy mount openssl umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
@@ -52,7 +56,7 @@ mkdir -p "$DIST_DIR" "$WORK_DIR/root"
 curl -fL "$RPI_OS_IMAGE_URL" -o "$WORK_DIR/os.img.xz"
 xz -dc "$WORK_DIR/os.img.xz" > "$WORK_DIR/os.img"
 BASE_IMAGE="$WORK_DIR/os.img"
-OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-rpi3-rpi4.img"
+OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-universal.img"
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
 
 read -r BOOT_START BOOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 1 "$OUTPUT_IMAGE")
@@ -82,13 +86,16 @@ for item in app config scripts session systemd install.sh README.md; do
   cp -a "$ROOT_DIR/$item" "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
 done
 
-escaped_ssid=${WIFI_SSID//\"/\\\"}
 escaped_psk=${WIFI_PSK//\"/\\\"}
-cat > "$WORK_DIR/root/etc/NetworkManager/system-connections/Home.nmconnection" <<EOF
+write_wifi_profile() {
+  local ssid=$1 filename=$2 priority=$3
+  local escaped_ssid=${ssid//\"/\\\"}
+  cat > "$WORK_DIR/root/etc/NetworkManager/system-connections/$filename.nmconnection" <<EOF
 [connection]
-id=$escaped_ssid
+id=Rahamin WiFi $escaped_ssid
 type=wifi
 autoconnect=true
+autoconnect-priority=$priority
 
 [wifi]
 mode=infrastructure
@@ -104,13 +111,18 @@ method=auto
 [ipv6]
 method=auto
 EOF
-chmod 600 "$WORK_DIR/root/etc/NetworkManager/system-connections/Home.nmconnection"
+  chmod 600 "$WORK_DIR/root/etc/NetworkManager/system-connections/$filename.nmconnection"
+}
+
+write_wifi_profile "$WIFI_PRIMARY_SSID" Rahamin-Home 20
+if [[ "$WIFI_SECONDARY_SSID" != "$WIFI_PRIMARY_SSID" ]]; then
+  write_wifi_profile "$WIFI_SECONDARY_SSID" Rahamin-Baiamonte 10
+fi
 
 cat > "$WORK_DIR/root/etc/NetworkManager/system-connections/Rahamin-Ethernet.nmconnection" <<EOF
 [connection]
 id=Rahamin Ethernet
 type=ethernet
-interface-name=eth0
 autoconnect=true
 
 [ethernet]
@@ -151,6 +163,8 @@ install -m 0644 "$ROOT_DIR/image/tv-kiosk-firstboot.service" "$WORK_DIR/root/etc
   printf 'KIOSK_UPDATE_BRANCH=%q\n' "$KIOSK_UPDATE_BRANCH"
   printf 'KIOSK_REPO_URL=%q\n' "$KIOSK_REPO_URL"
   printf 'WIFI_COUNTRY=%q\n' "$WIFI_COUNTRY"
+  printf 'KIOSK_PROFILE=%q\n' "$KIOSK_PROFILE"
+  printf 'BAIAMONTE_TV_URL=%q\n' "$BAIAMONTE_TV_URL"
 } > "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 chmod 600 "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/tv-kiosk-firstboot.service"

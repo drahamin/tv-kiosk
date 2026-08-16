@@ -13,6 +13,8 @@ fi
 : "${KIOSK_UPDATE_BRANCH:=main}"
 : "${KIOSK_REPO_URL:=}"
 : "${WIFI_COUNTRY:=US}"
+: "${KIOSK_PROFILE:=auto}"
+: "${BAIAMONTE_TV_URL:=http://rahamin-adsb.local:8998/tv}"
 
 progress() {
   printf '\n\033[1;36m[%s/6]\033[0m \033[1m%s\033[0m\n' "$1" "$2"
@@ -43,7 +45,7 @@ printf 'Initial setup normally takes 10 to 25 minutes.\n'
 
 HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
 case "$HARDWARE_MODEL" in
-  *"Raspberry Pi 3"*|*"Raspberry Pi 4"*)
+  *"Raspberry Pi Zero"*|*"Raspberry Pi 3"*|*"Raspberry Pi 4"*|*"Raspberry Pi 5"*)
     printf 'Detected supported hardware: %s\n' "$HARDWARE_MODEL"
     ;;
   *)
@@ -91,7 +93,7 @@ fi
 
 progress 5 'Installing the browser and full-screen display'
 printf 'The display software is being checked and configured.\n'
-"$INSTALLER" >> "$LOG_FILE" 2>&1
+KIOSK_PORT="$KIOSK_PORT" KIOSK_UPDATE_BRANCH="$KIOSK_UPDATE_BRANCH" KIOSK_PROFILE="$KIOSK_PROFILE" BAIAMONTE_TV_URL="$BAIAMONTE_TV_URL" "$INSTALLER" >> "$LOG_FILE" 2>&1
 
 progress 6 'Setup complete — starting Rahamin Kiosk'
 systemctl disable tv-kiosk-firstboot.service >> "$LOG_FILE" 2>&1
