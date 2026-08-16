@@ -36,8 +36,9 @@
   </main>
   <footer>NO INPUT REQUIRED</footer>
   <script>
-    const zero = new URLSearchParams(location.search).get("profile") === "zero";
-    if (zero) {
+    const params = new URLSearchParams(location.search);
+    const baiamonte = params.get("variant") === "baiamonte" || params.get("profile") === "zero";
+    if (baiamonte) {
       document.getElementById("brand-logo").src = "baiamonte-logo.svg";
       document.getElementById("brand-logo").alt = "Baiamonte Tenuta";
       document.getElementById("brand-name").textContent = "BAIAMONTE · RAHAMIN KIOSK";

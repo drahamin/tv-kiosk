@@ -8,11 +8,15 @@ fi
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 LOCAL_CONFIG="$ROOT_DIR/image/config.local.env"
+REQUESTED_KIOSK_PROFILE=${KIOSK_PROFILE-}
+REQUESTED_KIOSK_VARIANT=${KIOSK_VARIANT-}
 if [[ -f "$LOCAL_CONFIG" ]]; then
   set -a
   source "$LOCAL_CONFIG"
   set +a
 fi
+[[ -z "$REQUESTED_KIOSK_PROFILE" ]] || KIOSK_PROFILE=$REQUESTED_KIOSK_PROFILE
+[[ -z "$REQUESTED_KIOSK_VARIANT" ]] || KIOSK_VARIANT=$REQUESTED_KIOSK_VARIANT
 
 : "${WIFI_PRIMARY_SSID:=${WIFI_SSID:-Home}}"
 : "${WIFI_SECONDARY_SSID:=Baiamonte}"
@@ -21,6 +25,7 @@ fi
 : "${KIOSK_PORT:=8999}"
 : "${KIOSK_UPDATE_BRANCH:=main}"
 : "${KIOSK_PROFILE:=auto}"
+: "${KIOSK_VARIANT:=auto}"
 : "${BAIAMONTE_TV_URL:=http://192.168.0.10:8101}"
 : "${KIOSK_REPO_URL:=}"
 : "${RPI_OS_IMAGE_URL:=}"
@@ -32,8 +37,13 @@ fi
 [[ -s "$SSH_PUBLIC_KEY_FILE" ]] || { echo "Missing SSH public key: $SSH_PUBLIC_KEY_FILE" >&2; exit 1; }
 [[ "$WIFI_COUNTRY" =~ ^[A-Z]{2}$ ]] || { echo "WIFI_COUNTRY must be a two-letter uppercase country code" >&2; exit 1; }
 [[ "$KIOSK_PROFILE" =~ ^(auto|zero|multi)$ ]] || { echo "KIOSK_PROFILE must be auto, zero, or multi" >&2; exit 1; }
+[[ "$KIOSK_VARIANT" =~ ^(auto|baiamonte|rahamin)$ ]] || { echo "KIOSK_VARIANT must be auto, baiamonte, or rahamin" >&2; exit 1; }
+if [[ "$KIOSK_VARIANT" == rahamin && "$KIOSK_PROFILE" == zero ]]; then
+  echo "The Rahamin five-page image requires KIOSK_PROFILE=multi or auto." >&2
+  exit 1
+fi
 
-for command in curl losetup mcopy mount openssl umount xz; do
+for command in curl losetup mcopy mount openssl sha256sum umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
 done
 
@@ -58,7 +68,11 @@ mkdir -p "$DIST_DIR" "$WORK_DIR/root"
 curl -fL "$RPI_OS_IMAGE_URL" -o "$WORK_DIR/os.img.xz"
 xz -dc "$WORK_DIR/os.img.xz" > "$WORK_DIR/os.img"
 BASE_IMAGE="$WORK_DIR/os.img"
-OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-universal.img"
+case "$KIOSK_VARIANT" in
+  baiamonte) OUTPUT_IMAGE="$DIST_DIR/baiamonte-kiosk-universal.img" ;;
+  rahamin) OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-five-page.img" ;;
+  *) OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-universal.img" ;;
+esac
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
 
 read -r BOOT_START BOOT_SECTORS < <(partx --raw --noheadings --output START,SECTORS --nr 1 "$OUTPUT_IMAGE")
@@ -184,6 +198,7 @@ install -m 0644 "$ROOT_DIR/image/tv-kiosk-firstboot.service" "$WORK_DIR/root/etc
   printf 'WIFI_PRIMARY_SSID=%q\n' "$WIFI_PRIMARY_SSID"
   printf 'WIFI_SECONDARY_SSID=%q\n' "$WIFI_SECONDARY_SSID"
   printf 'KIOSK_PROFILE=%q\n' "$KIOSK_PROFILE"
+  printf 'KIOSK_VARIANT=%q\n' "$KIOSK_VARIANT"
   printf 'BAIAMONTE_TV_URL=%q\n' "$BAIAMONTE_TV_URL"
 } > "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 chmod 600 "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
@@ -212,4 +227,8 @@ losetup -d "$ROOT_LOOP"
 ROOT_LOOP=""
 
 xz -T0 -f -k "$OUTPUT_IMAGE"
-echo "Created $OUTPUT_IMAGE and $OUTPUT_IMAGE.xz"
+(
+  cd "$(dirname "$OUTPUT_IMAGE")"
+  sha256sum "$(basename "$OUTPUT_IMAGE").xz" > "$(basename "$OUTPUT_IMAGE").xz.sha256"
+)
+echo "Created $OUTPUT_IMAGE, $OUTPUT_IMAGE.xz, and $OUTPUT_IMAGE.xz.sha256"

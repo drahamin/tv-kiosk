@@ -21,7 +21,12 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 HARDWARE_PROFILE = os.environ.get("KIOSK_HARDWARE_PROFILE", "multi").strip().lower()
-DEFAULT_CONFIG_PATH = ROOT / "config" / ("kiosk-zero.json" if HARDWARE_PROFILE == "zero" else "kiosk.json")
+KIOSK_VARIANT = os.environ.get("KIOSK_VARIANT", "auto").strip().lower()
+if KIOSK_VARIANT == "baiamonte" or (KIOSK_VARIANT == "auto" and HARDWARE_PROFILE == "zero"):
+    DEFAULT_CONFIG_NAME = "kiosk-zero.json" if HARDWARE_PROFILE == "zero" else "kiosk-baiamonte.json"
+else:
+    DEFAULT_CONFIG_NAME = "kiosk.json"
+DEFAULT_CONFIG_PATH = ROOT / "config" / DEFAULT_CONFIG_NAME
 STATE_DIR = Path(os.environ.get("KIOSK_STATE_DIR", Path.home() / ".config" / "tv-kiosk"))
 CONFIG_PATH = Path(os.environ.get("KIOSK_CONFIG", STATE_DIR / "kiosk.json"))
 CREDENTIALS_PATH = Path(os.environ.get("KIOSK_CREDENTIALS", STATE_DIR / "admin.json"))

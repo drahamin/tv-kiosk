@@ -33,7 +33,7 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--disk-cache-size=268435456", command)
         self.assertIn("--renderer-process-limit=3", command)
         self.assertNotIn("--incognito", command)
-        self.assertTrue(command[-1].endswith("/session/boot.html?profile=multi"))
+        self.assertTrue(command[-1].endswith("/session/boot.html?profile=multi&variant=auto"))
         self.assertNotIn("--mute-audio", command)
 
     def test_chromium_can_disable_audio_without_extra_processes(self):
@@ -52,7 +52,7 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--enable-low-end-device-mode", command)
         self.assertIn("--process-per-site", command)
         self.assertIn("--js-flags=--max-old-space-size=192", command)
-        self.assertTrue(command[-1].endswith("/session/boot.html?profile=zero"))
+        self.assertTrue(command[-1].endswith("/session/boot.html?profile=zero&variant=auto"))
 
     def test_pi_zero_uses_armv6_compatible_fullscreen_cog(self):
         fake = MagicMock()

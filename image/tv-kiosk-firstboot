@@ -16,6 +16,7 @@ fi
 : "${WIFI_PRIMARY_SSID:=Home}"
 : "${WIFI_SECONDARY_SSID:=Baiamonte}"
 : "${KIOSK_PROFILE:=auto}"
+: "${KIOSK_VARIANT:=auto}"
 : "${BAIAMONTE_TV_URL:=http://192.168.0.10:8101}"
 
 progress() {
@@ -105,7 +106,7 @@ fi
 
 progress 5 'Installing the browser and full-screen display'
 printf 'The display software is being checked and configured.\n'
-KIOSK_PORT="$KIOSK_PORT" KIOSK_UPDATE_BRANCH="$KIOSK_UPDATE_BRANCH" KIOSK_PROFILE="$KIOSK_PROFILE" BAIAMONTE_TV_URL="$BAIAMONTE_TV_URL" "$INSTALLER" >> "$LOG_FILE" 2>&1
+KIOSK_PORT="$KIOSK_PORT" KIOSK_UPDATE_BRANCH="$KIOSK_UPDATE_BRANCH" KIOSK_PROFILE="$KIOSK_PROFILE" KIOSK_VARIANT="$KIOSK_VARIANT" BAIAMONTE_TV_URL="$BAIAMONTE_TV_URL" "$INSTALLER" >> "$LOG_FILE" 2>&1
 
 progress 6 'Setup complete — starting Rahamin Kiosk'
 systemctl disable tv-kiosk-firstboot.service >> "$LOG_FILE" 2>&1

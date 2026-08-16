@@ -1,4 +1,4 @@
-# Rahamin Kiosk for Raspberry Pi Zero, 3, 4, and 5
+# Rahamin and Baiamonte TV Kiosk Images
 
 Rahamin Kiosk is a full-screen, remotely managed display for a 75-inch 16:9
 Samsung television. It can rotate up to five enabled web pages at a configurable
@@ -10,14 +10,21 @@ interval. The default playlist rotates every 45 seconds:
 4. Miami Weather
 5. Sicily Weather
 
-The same installer automatically selects a lighter **Baiamonte Pi Zero** profile
-on every Pi Zero and Pi Zero 2. That profile opens one full-screen Baiamonte
-dashboard, never rotates or reloads it on a timer, and keeps only one Chromium
-renderer on Pi Zero 2 or one ARMv6-compatible Cog renderer on the original Zero.
-The Pi Zero defaults to the VPN-local Baiamonte ADS-B TV display at
-`http://192.168.0.10:8101`. Set `BAIAMONTE_TV_URL` during image
-creation or edit Page 1 in Admin to change it.
-Pi 3, Pi 4, and Pi 5 continue to use the five-page profile.
+The project produces two flashable image products:
+
+1. **Baiamonte Kiosk** — one image for both Pi Zero and Pi 3+. It detects the
+   board at first boot. Pi Zero uses the lightweight dashboard mode and omits
+   camera-heavy dashboard sections; Pi 3+ uses Chromium and displays every
+   Baiamonte dashboard section. Both open the VPN-local TV display at
+   `http://192.168.0.10:8101` by default.
+2. **Rahamin Kiosk — Five Page** — a Pi 3+ image with the five enabled ADS-B,
+   AIS, airport, Miami weather, and Sicily weather pages listed above. It begins
+   rotating immediately at 45-second intervals.
+
+The images share the same Admin page, dual Wi-Fi setup, DHCP Ethernet, key-only
+SSH maintenance, HDMI/CEC handling, recovery supervision, and GitHub updater.
+Set `BAIAMONTE_TV_URL` during image creation or edit Page 1 in Admin to change
+the Baiamonte dashboard address.
 
 The local service listens on port `8999` by default and provides:
 
@@ -110,8 +117,8 @@ updates, and installs supervised browser recovery. It also disables unused
 Bluetooth and NFS/RPC services and safely trims old package archives, logs, and
 crash reports without removing required Raspberry Pi components.
 
-The same image supports Pi Zero/Zero W/Zero 2 W, Raspberry Pi 3B/3B+, Pi 4B,
-and Pi 5. Pi 4 uses its
+The adaptive Baiamonte image supports Pi Zero/Zero W/Zero 2 W and Pi 3+.
+The Rahamin five-page image supports Raspberry Pi 3B/3B+, Pi 4B, and Pi 5. Pi 4 uses its
 first micro-HDMI port and should use a proper 5V/3A USB-C supply. Pi 3 should use
 a reliable 5V/2.5A micro-USB supply. Undervoltage can reset either model while
 Chromium is loading map pages.
@@ -143,16 +150,21 @@ changed administrator password remain untouched.
 ## Build a flashable image
 
 On an Ubuntu Linux machine with `sudo`, `curl`, `xz`, `losetup`, `mtools`, and
-`mount` installed:
+`mount` installed, build both products with one command:
 
 ```sh
-sudo ./image/build-image.sh
+sudo ./image/build-images.sh
 ```
 
-The builder downloads Raspberry Pi OS Desktop 32-bit, provisions the `kiosk`
+The builder downloads Raspberry Pi OS Lite 32-bit, provisions the `kiosk`
 account, enables key-only SSH, embeds DHCP Ethernet plus both Wi-Fi profiles,
-includes the kiosk, and writes `dist/rahamin-kiosk-universal.img` plus its compressed
-`.xz` file. On first boot, a full-screen
+and writes:
+
+- `dist/baiamonte-kiosk-universal.img.xz` for Pi Zero or Pi 3+;
+- `dist/rahamin-kiosk-five-page.img.xz` for Pi 3+;
+- a matching `.sha256` integrity file for each compressed image.
+
+On first boot, a full-screen
 progress display reports every installation stage and automatic retry. After the
 reboot, the configuration screen displays the address to use from a phone or
 computer on the same network.
@@ -160,11 +172,13 @@ computer on the same network.
 For GitHub auto-updates, publish the repository and pass its clone URL:
 
 ```sh
-sudo KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git ./image/build-image.sh
+sudo KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git ./image/build-images.sh
 ```
 
-Installer choices are `KIOSK_PROFILE=auto` (recommended), `zero`, and `multi`.
-`auto` detects the board during first boot. A typical private
+`KIOSK_VARIANT` selects `baiamonte`, `rahamin`, or the backward-compatible
+`auto` behavior. `KIOSK_PROFILE` selects the hardware tuning: `auto`
+(recommended), `zero`, or `multi`. The two-image builder chooses the correct
+combination automatically. A typical private
 `image/config.local.env` is:
 
 ```sh
@@ -172,6 +186,7 @@ WIFI_PRIMARY_SSID=Home
 WIFI_SECONDARY_SSID=Baiamonte
 WIFI_PSK=your-shared-password
 KIOSK_PROFILE=auto
+KIOSK_VARIANT=baiamonte
 BAIAMONTE_TV_URL=http://192.168.0.10:8101
 KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
 ```

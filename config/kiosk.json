@@ -9,7 +9,7 @@
   "show_status": true,
   "background": "#080706",
   "theme": "rahamin",
-  "setup_complete": false,
+  "setup_complete": true,
   "pages": [
     {
       "name": "Rahamin ADS-B TV",

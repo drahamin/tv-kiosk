@@ -12,6 +12,7 @@ KIOSK_USER=${KIOSK_USER:-kiosk}
 KIOSK_PORT=${KIOSK_PORT:-8999}
 KIOSK_UPDATE_BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 KIOSK_PROFILE=${KIOSK_PROFILE:-auto}
+KIOSK_VARIANT=${KIOSK_VARIANT:-auto}
 BAIAMONTE_TV_URL=${BAIAMONTE_TV_URL:-http://192.168.0.10:8101}
 WIFI_PRIMARY_SSID=${WIFI_PRIMARY_SSID:-Home}
 WIFI_SECONDARY_SSID=${WIFI_SECONDARY_SSID:-Baiamonte}
@@ -19,7 +20,25 @@ WIFI_PSK=${WIFI_PSK:-}
 
 HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
 HARDWARE_PROFILE=$(KIOSK_PROFILE="$KIOSK_PROFILE" KIOSK_HARDWARE_MODEL="$HARDWARE_MODEL" sh "$SOURCE_DIR/scripts/detect-hardware-profile")
-echo "Installing Rahamin Kiosk on $HARDWARE_MODEL ($HARDWARE_PROFILE profile)"
+case "$KIOSK_VARIANT" in
+  auto)
+    if [ "$HARDWARE_PROFILE" = zero ]; then
+      INSTALL_VARIANT=baiamonte
+    else
+      INSTALL_VARIANT=rahamin
+    fi
+    ;;
+  baiamonte|rahamin) INSTALL_VARIANT=$KIOSK_VARIANT ;;
+  *)
+    echo "KIOSK_VARIANT must be auto, baiamonte, or rahamin" >&2
+    exit 1
+    ;;
+esac
+if [ "$INSTALL_VARIANT" = rahamin ] && [ "$HARDWARE_PROFILE" = zero ]; then
+  echo "The Rahamin five-page kiosk requires a Raspberry Pi 3 or newer." >&2
+  exit 1
+fi
+echo "Installing $INSTALL_VARIANT kiosk on $HARDWARE_MODEL ($HARDWARE_PROFILE profile)"
 
 if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
   apt-get update
@@ -59,6 +78,7 @@ cat > /etc/tv-kiosk/kiosk.env <<EOF
 KIOSK_PORT=$KIOSK_PORT
 KIOSK_UPDATE_BRANCH=$KIOSK_UPDATE_BRANCH
 KIOSK_HARDWARE_PROFILE=$HARDWARE_PROFILE
+KIOSK_VARIANT=$INSTALL_VARIANT
 EOF
 
 cat > /etc/lightdm/lightdm.conf.d/50-tv-kiosk.conf <<EOF
@@ -74,8 +94,13 @@ cp "$APP_DIR/session/openbox-autostart" "/home/$KIOSK_USER/.config/openbox/autos
 cp "$APP_DIR/session/labwc-autostart" "/home/$KIOSK_USER/.config/labwc/autostart"
 cp "$APP_DIR/session/labwc-rc.xml" "/home/$KIOSK_USER/.config/labwc/rc.xml"
 if [ ! -e "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" ]; then
-  if [ "$HARDWARE_PROFILE" = zero ]; then
-    cp "$APP_DIR/config/kiosk-zero.json" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
+  if [ "$INSTALL_VARIANT" = baiamonte ]; then
+    if [ "$HARDWARE_PROFILE" = zero ]; then
+      DEFAULT_CONFIG="$APP_DIR/config/kiosk-zero.json"
+    else
+      DEFAULT_CONFIG="$APP_DIR/config/kiosk-baiamonte.json"
+    fi
+    cp "$DEFAULT_CONFIG" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
     python3 - "$BAIAMONTE_TV_URL" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" <<'PY'
 import json, sys
 url, target = sys.argv[1:]

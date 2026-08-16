@@ -30,6 +30,20 @@ class InstallProfileTests(unittest.TestCase):
         self.assertEqual(len(config["pages"]), 1)
         self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8101")
 
+    def test_baiamonte_pi_three_default_uses_full_dashboard(self):
+        config = json.loads((ROOT / "config" / "kiosk-baiamonte.json").read_text(encoding="utf-8"))
+        self.assertTrue(config["setup_complete"])
+        self.assertEqual(len(config["pages"]), 1)
+        self.assertIn("All Pages", config["pages"][0]["name"])
+        self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8101")
+
+    def test_rahamin_default_is_ready_with_five_pages(self):
+        config = json.loads((ROOT / "config" / "kiosk.json").read_text(encoding="utf-8"))
+        self.assertTrue(config["setup_complete"])
+        self.assertEqual(config["rotation_seconds"], 45)
+        self.assertEqual(len(config["pages"]), 5)
+        self.assertTrue(all(page["enabled"] for page in config["pages"]))
+
     def test_universal_image_contains_dual_wifi_and_profile_settings(self):
         builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
         self.assertIn("WIFI_PRIMARY_SSID", builder)
@@ -37,7 +51,10 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("Rahamin-Home", builder)
         self.assertIn("Rahamin-Baiamonte", builder)
         self.assertIn("KIOSK_PROFILE", builder)
+        self.assertIn("KIOSK_VARIANT", builder)
         self.assertIn("rahamin-kiosk-universal.img", builder)
+        self.assertIn("baiamonte-kiosk-universal.img", builder)
+        self.assertIn("rahamin-kiosk-five-page.img", builder)
         self.assertIn("raspios_lite_armhf_latest", builder)
         self.assertIn("band=bg", builder)
         self.assertIn("powersave=2", builder)
@@ -61,7 +78,8 @@ class InstallProfileTests(unittest.TestCase):
         setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
         self.assertIn("baiamonte-logo.svg", boot)
         self.assertIn("miami-logo.svg", boot)
-        self.assertIn("?profile={quote(profile_name)}", browser)
+        self.assertIn("variant={quote(KIOSK_VARIANT)}", browser)
+        self.assertIn('params.get("variant") === "baiamonte"', boot)
         self.assertIn("display_auto_detect=1", setup)
         self.assertIn("hdmi_force_hotplug=1", setup)
         self.assertIn("hdmi_force_edid_audio=1", setup)
@@ -79,6 +97,18 @@ class InstallProfileTests(unittest.TestCase):
         self.assertNotIn("Before=", unit)
         self.assertNotIn("Conflicts=", unit)
         self.assertIn('getty@tty1.service"', builder)
+
+    def test_two_image_builder_selects_adaptive_baiamonte_and_rahamin_pi_three(self):
+        builder = (ROOT / "image" / "build-images.sh").read_text(encoding="utf-8")
+        self.assertIn("KIOSK_VARIANT=baiamonte KIOSK_PROFILE=auto", builder)
+        self.assertIn("KIOSK_VARIANT=rahamin KIOSK_PROFILE=multi", builder)
+
+    def test_installer_separates_brand_variant_from_hardware_profile(self):
+        installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+        self.assertIn("KIOSK_VARIANT=${KIOSK_VARIANT:-auto}", installer)
+        self.assertIn("KIOSK_VARIANT=$INSTALL_VARIANT", installer)
+        self.assertIn("config/kiosk-baiamonte.json", installer)
+        self.assertIn("config/kiosk-zero.json", installer)
 
     def test_installer_uses_matching_lightweight_wayland_session(self):
         installer = (ROOT / "install.sh").read_text(encoding="utf-8")

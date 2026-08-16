@@ -20,6 +20,7 @@ DEBUG_PORT = int(os.environ.get("KIOSK_DEBUG_PORT", "9222"))
 CHROMIUM = os.environ.get("KIOSK_CHROMIUM", "chromium")
 COG = os.environ.get("KIOSK_COG", "cog")
 HARDWARE_PROFILE = os.environ.get("KIOSK_HARDWARE_PROFILE", "multi").strip().lower()
+KIOSK_VARIANT = os.environ.get("KIOSK_VARIANT", "auto").strip().lower()
 running = True
 requested_step = 0
 BOOT_MIN_SECONDS = 4
@@ -165,7 +166,7 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None)
         f"--disk-cache-size={cache_size}",
         "--disable-pinch",
         "--overscroll-history-navigation=0",
-        f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile={quote(profile_name)}",
+        f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile={quote(profile_name)}&variant={quote(KIOSK_VARIANT)}",
     ]
     if profile_name == "zero":
         command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", "--js-flags=--max-old-space-size=192"]
