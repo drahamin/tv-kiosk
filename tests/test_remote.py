@@ -19,6 +19,10 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn('last_action_ms', script)
         self.assertIn('date +%s%3N', script)
         self.assertIn('key pressed: enter', script)
+        self.assertIn('echo previous_page', script)
+        self.assertIn('echo next_page', script)
+        self.assertIn('--signal=SIGUSR1 tv-kiosk-browser.service', script)
+        self.assertIn('--signal=SIGUSR2 tv-kiosk-browser.service', script)
         self.assertIn("cec-client -t p -d 31", script)
         self.assertIn("printf 'as\\n'", script)
 

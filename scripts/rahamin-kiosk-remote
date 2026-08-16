@@ -14,11 +14,11 @@ cec_action() {
   case "$1" in
     *"key pressed: up"*) echo up ;;
     *"key pressed: down"*) echo down ;;
-    *"key pressed: left"*) echo left ;;
-    *"key pressed: right"*) echo right ;;
-    *"key pressed: select"*|*"key pressed: enter"*) echo select ;;
-    *"key pressed: page up"*) echo page_up ;;
-    *"key pressed: page down"*) echo page_down ;;
+    *"key pressed: left"*) echo previous_page ;;
+    *"key pressed: right"*) echo next_page ;;
+    *"key pressed: select"*|*"key pressed: enter"*) echo next_page ;;
+    *"key pressed: page up"*) echo previous_page ;;
+    *"key pressed: page down"*) echo next_page ;;
     *"key pressed: play/pause"*|*"key pressed: play"*|*"key pressed: pause"*) echo play_pause ;;
     *"key pressed: fast forward"*|*"key pressed: forward"*|*"key pressed: channel up"*) echo zoom_in ;;
     *"key pressed: rewind"*|*"key pressed: backward"*|*"key pressed: channel down"*) echo zoom_out ;;
@@ -28,10 +28,9 @@ cec_action() {
 
 send_action() {
   case "$1" in
-    up|down|left|right) send_key "$1" ;;
-    select) send_key Return ;;
-    page_up) send_key Page_Up ;;
-    page_down) send_key Page_Down ;;
+    up|down) send_key "$1" ;;
+    previous_page) systemctl --user kill --signal=SIGUSR2 tv-kiosk-browser.service ;;
+    next_page) systemctl --user kill --signal=SIGUSR1 tv-kiosk-browser.service ;;
     play_pause) send_key space ;;
     zoom_in) send_control_key plus ;;
     zoom_out) send_control_key minus ;;
