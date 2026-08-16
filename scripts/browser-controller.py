@@ -19,12 +19,20 @@ DEFAULT_CONFIG = ROOT / "config" / "kiosk.json"
 DEBUG_PORT = int(os.environ.get("KIOSK_DEBUG_PORT", "9222"))
 CHROMIUM = os.environ.get("KIOSK_CHROMIUM", "chromium")
 running = True
+requested_step = 0
 BOOT_MIN_SECONDS = 4
 
 
 def stop(_signum, _frame):
     global running
     running = False
+
+
+def request_page(step):
+    def handler(_signum, _frame):
+        global requested_step
+        requested_step = step
+    return handler
 
 
 def load_config():
@@ -158,6 +166,7 @@ def launch_chromium(zoom_percent=100, audio_enabled=True):
 
 
 def supervise():
+    global requested_step
     while running:
         launch_config = load_config()
         configure_audio(launch_config)
@@ -185,6 +194,13 @@ def supervise():
                     current = 0
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                     print("Loaded kiosk playlist:", ", ".join(page["name"] for page in config["pages"]), flush=True)
+                if requested_step:
+                    step = requested_step
+                    requested_step = 0
+                    current = (current + step) % len(config["pages"])
+                    tab_id = replace_tab(config["pages"][current]["url"], tab_id)
+                    print(f"Remote selected page {current + 1}: {config['pages'][current]['name']}", flush=True)
+                    next_rotation = time.monotonic() + config["rotation_seconds"]
                 if time.monotonic() >= next_rotation:
                     current = (current + 1) % len(config["pages"])
                     tab_id = replace_tab(config["pages"][current]["url"], tab_id)
@@ -207,4 +223,6 @@ def supervise():
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGUSR1, request_page(1))
+    signal.signal(signal.SIGUSR2, request_page(-1))
     supervise()

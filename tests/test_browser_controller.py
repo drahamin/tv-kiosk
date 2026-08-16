@@ -12,6 +12,12 @@ spec.loader.exec_module(controller)
 
 
 class BrowserControllerTests(unittest.TestCase):
+    def test_remote_signals_select_previous_and_next_pages(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("signal.SIGUSR1, request_page(1)", source)
+        self.assertIn("signal.SIGUSR2, request_page(-1)", source)
+        self.assertIn("Remote selected page", source)
+
     def test_chromium_launch_forces_fullscreen(self):
         fake = MagicMock()
         with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
