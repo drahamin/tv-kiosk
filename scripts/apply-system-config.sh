@@ -34,20 +34,38 @@ EOF
   systemctl enable --now zramswap.service >/dev/null 2>&1 || true
   systemctl disable --now dphys-swapfile.service >/dev/null 2>&1 || true
 
-  BOOT_CONFIG=/boot/firmware/config.txt
-  [ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
-  if [ -f "$BOOT_CONFIG" ] && ! grep -q 'Rahamin Pi Zero Samsung HDMI' "$BOOT_CONFIG"; then
-    cat >> "$BOOT_CONFIG" <<'EOF'
+fi
 
-# Rahamin Pi Zero Samsung HDMI: stable 1080p, audio-capable output.
+# Keep HDMI enabled when a Samsung TV powers up slowly or briefly drops HPD.
+# EDID remains enabled so multi-profile Pis use the TV's preferred mode. The
+# Zero profile uses a stable 1080p60 fallback to keep GPU/memory load bounded.
+BOOT_CONFIG=/boot/firmware/config.txt
+[ -f "$BOOT_CONFIG" ] || BOOT_CONFIG=/boot/config.txt
+if [ -f "$BOOT_CONFIG" ]; then
+  sed -i '/^# BEGIN Rahamin Kiosk HDMI$/,/^# END Rahamin Kiosk HDMI$/d' "$BOOT_CONFIG"
+  # Replace the marker used by earlier images before writing the managed block.
+  sed -i '/^# Rahamin Pi Zero Samsung HDMI:/,/^max_framebuffers=1$/d' "$BOOT_CONFIG"
+  cat >> "$BOOT_CONFIG" <<'EOF'
+
+# BEGIN Rahamin Kiosk HDMI
+# Read the connected TV EDID, but keep HDMI/HPD asserted during slow TV startup.
+display_auto_detect=1
 hdmi_force_hotplug=1
 hdmi_drive=2
+hdmi_force_edid_audio=1
+disable_overscan=1
+EOF
+  if [ "$KIOSK_HARDWARE_PROFILE" = zero ]; then
+    cat >> "$BOOT_CONFIG" <<'EOF'
+# Stable CEA 1080p60 fallback for the resource-constrained Pi Zero.
 hdmi_group=1
 hdmi_mode=16
-disable_overscan=1
 max_framebuffers=1
 EOF
   fi
+  cat >> "$BOOT_CONFIG" <<'EOF'
+# END Rahamin Kiosk HDMI
+EOF
 fi
 
 if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1; then
