@@ -25,7 +25,7 @@ if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
   apt-get update
 fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  avahi-daemon cec-utils chromium git lightdm network-manager openbox openssh-server pipewire pipewire-pulse python3 unclutter wireplumber wtype x11-xserver-utils xserver-xorg
+  avahi-daemon cec-utils chromium git labwc lightdm network-manager openssh-server pipewire pipewire-pulse python3 wireplumber wtype
 if [ "$HARDWARE_PROFILE" = zero ]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends zram-tools
 fi
@@ -63,8 +63,8 @@ cat > /etc/lightdm/lightdm.conf.d/50-tv-kiosk.conf <<EOF
 [Seat:*]
 autologin-user=$KIOSK_USER
 autologin-user-timeout=0
-autologin-session=openbox
-user-session=openbox
+autologin-session=labwc
+user-session=labwc
 xserver-command=X -s 0 -dpms
 EOF
 

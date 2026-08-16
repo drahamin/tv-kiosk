@@ -77,6 +77,14 @@ class InstallProfileTests(unittest.TestCase):
         self.assertNotIn("Conflicts=", unit)
         self.assertIn('getty@tty1.service"', builder)
 
+    def test_installer_uses_matching_lightweight_wayland_session(self):
+        installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+        updater = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        self.assertIn("avahi-daemon cec-utils chromium git labwc lightdm", installer)
+        self.assertIn("autologin-session=labwc", installer)
+        self.assertIn("autologin-session=labwc", updater)
+        self.assertNotIn("autologin-session=openbox", installer)
+
 
 if __name__ == "__main__":
     unittest.main()

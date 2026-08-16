@@ -76,10 +76,22 @@ EOF
 EOF
 fi
 
-if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1; then
+if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils wtype
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc wtype
 fi
+
+# Older builds selected Openbox even though the optimized Chromium and CEC
+# units use native Wayland. Keep every update pinned to the matching labwc
+# session so the browser starts full-screen instead of waiting indefinitely.
+install -d -m 0755 /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/50-tv-kiosk.conf <<EOF
+[Seat:*]
+autologin-user=$KIOSK_USER
+autologin-user-timeout=0
+autologin-session=labwc
+user-session=labwc
+EOF
 
 # Early images could leave the dedicated home owned by root, which prevents
 # pcmanfm, Chromium, and WirePlumber from creating normal session state.
