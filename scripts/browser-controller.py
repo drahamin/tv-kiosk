@@ -178,7 +178,14 @@ def launch_cog(url):
     environment = os.environ.copy()
     environment["COG_PLATFORM_WL_VIEW_FULLSCREEN"] = "1"
     environment["COG_PLATFORM_WL_VIEW_MAXIMIZE"] = "1"
-    return subprocess.Popen([COG, "--platform=wl", url], env=environment)
+    return subprocess.Popen([
+        COG,
+        "--platform=wl",
+        "--enable-page-cache=true",
+        "--enable-offline-web-application-cache=true",
+        "--enable-smooth-scrolling=false",
+        url,
+    ], env=environment)
 
 
 def supervise_cog():

@@ -60,7 +60,14 @@ class BrowserControllerTests(unittest.TestCase):
             self.assertIs(controller.launch_cog("https://cloud.example/tv"), fake)
         command = popen.call_args.args[0]
         environment = popen.call_args.kwargs["env"]
-        self.assertEqual(command, ["cog", "--platform=wl", "https://cloud.example/tv"])
+        self.assertEqual(command, [
+            "cog",
+            "--platform=wl",
+            "--enable-page-cache=true",
+            "--enable-offline-web-application-cache=true",
+            "--enable-smooth-scrolling=false",
+            "https://cloud.example/tv",
+        ])
         self.assertEqual(environment["COG_PLATFORM_WL_VIEW_FULLSCREEN"], "1")
 
     def test_load_config_filters_disabled_pages(self):
