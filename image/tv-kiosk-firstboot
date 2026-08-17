@@ -19,6 +19,30 @@ fi
 : "${KIOSK_VARIANT:=auto}"
 : "${BAIAMONTE_TV_URL:=http://192.168.0.10:8101}"
 
+# Establish recovery access before networking, apt, or GitHub can fail. Recent
+# Raspberry Pi OS images do not consistently consume userconf.txt before this
+# root-owned service starts, leaving the staged kiosk home without a valid
+# passwd entry. Creating and unlocking the account here ensures key-only SSH is
+# available throughout the unattended installation.
+if ! id kiosk >/dev/null 2>&1; then
+  useradd --home-dir /home/kiosk --create-home --shell /bin/bash kiosk
+fi
+KIOSK_PASSWORD_STATE=$(passwd -S kiosk 2>/dev/null | awk '{print $2}')
+case "$KIOSK_PASSWORD_STATE" in
+  L|LK|NP)
+    KIOSK_RANDOM_PASSWORD=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+    printf '%s:%s\n' kiosk "$KIOSK_RANDOM_PASSWORD" | chpasswd
+    unset KIOSK_RANDOM_PASSWORD
+    ;;
+esac
+install -d -m 0700 -o kiosk -g kiosk /home/kiosk/.ssh
+if [ -s /opt/tv-kiosk-bootstrap/config/kiosk-admin.pub ]; then
+  install -m 0600 -o kiosk -g kiosk \
+    /opt/tv-kiosk-bootstrap/config/kiosk-admin.pub \
+    /home/kiosk/.ssh/authorized_keys
+fi
+systemctl reload ssh.service 2>/dev/null || systemctl restart ssh.service 2>/dev/null || true
+
 progress() {
   printf '\n\033[1;36m[%s/6]\033[0m \033[1m%s\033[0m\n' "$1" "$2"
 }

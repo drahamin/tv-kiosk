@@ -105,6 +105,16 @@ class InstallProfileTests(unittest.TestCase):
         self.assertNotIn("Conflicts=", unit)
         self.assertIn('getty@tty1.service"', builder)
 
+    def test_firstboot_enables_key_only_recovery_before_network_setup(self):
+        firstboot = (ROOT / "image" / "tv-kiosk-firstboot").read_text(encoding="utf-8")
+        account = firstboot.index("if ! id kiosk")
+        network = firstboot.index("progress 2 'Connecting to Wi-Fi and the internet'")
+        self.assertLess(account, network)
+        self.assertIn("config/kiosk-admin.pub", firstboot)
+        self.assertIn("/home/kiosk/.ssh/authorized_keys", firstboot)
+        self.assertIn("passwd -S kiosk", firstboot)
+        self.assertNotIn("NOPASSWD: ALL", firstboot)
+
     def test_two_image_builder_selects_adaptive_baiamonte_and_rahamin_pi_three(self):
         builder = (ROOT / "image" / "build-images.sh").read_text(encoding="utf-8")
         self.assertIn("KIOSK_VARIANT=baiamonte KIOSK_PROFILE=auto", builder)
