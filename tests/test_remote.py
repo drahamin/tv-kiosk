@@ -31,6 +31,16 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn("wayland-0", unit)
         self.assertIn("Restart=always", unit)
 
+    def test_baiamonte_remote_controls_dashboard_without_page_signals(self):
+        script = (ROOT / "scripts" / "rahamin-kiosk-remote").read_text(encoding="utf-8")
+        unit = (ROOT / "systemd" / "tv-kiosk-remote.service").read_text(encoding="utf-8")
+        self.assertIn('KIOSK_VARIANT=${KIOSK_VARIANT:-auto}', script)
+        self.assertIn('[ "$KIOSK_VARIANT" = baiamonte ]', script)
+        self.assertIn("send_key left", script)
+        self.assertIn("send_key right", script)
+        self.assertIn("send_key Return", script)
+        self.assertIn("EnvironmentFile=-/etc/tv-kiosk/kiosk.env", unit)
+
     def test_labwc_hides_and_warps_cursor(self):
         config = (ROOT / "session" / "labwc-rc.xml").read_text(encoding="utf-8")
         autostart = (ROOT / "session" / "labwc-autostart").read_text(encoding="utf-8")

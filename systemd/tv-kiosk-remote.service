@@ -7,6 +7,7 @@ StartLimitIntervalSec=0
 Type=simple
 Environment=XDG_RUNTIME_DIR=%t
 Environment=WAYLAND_DISPLAY=wayland-0
+EnvironmentFile=-/etc/tv-kiosk/kiosk.env
 ExecStartPre=/bin/sh -c 'while [ ! -S "%t/wayland-0" ]; do sleep 1; done'
 ExecStart=/opt/tv-kiosk/scripts/rahamin-kiosk-remote
 Restart=always
