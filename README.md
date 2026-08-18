@@ -84,17 +84,16 @@ unneeded desktop shell and panel are stopped, saving roughly 40 MB of memory.
 The kiosk listens for the Samsung television remote through Anynet+ (HDMI-CEC),
 with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
 
-- on Baiamonte displays, Left/Right change pages and Up/Down zoom the active ADS-B, AIS, or weather map;
+- Left/Right change pages and Up/Down zoom the active ADS-B, AIS, or weather map on both Rahamin and Baiamonte displays;
 - OK activates the selected control;
-- on Baiamonte displays, Play/Pause pauses or resumes rotation;
-- on Rahamin displays, Play/Pause controls page media;
+- Play/Pause pauses or resumes rotation when the displayed dashboard supports it;
 - Fast-forward and Rewind to zoom in and out;
 - Stop to reset browser zoom to 100%.
 
 Samsung keeps the Channel rocker for television functions and may show an
-unsupported-mode message when it is pressed on an HDMI input. The CEC listener
-registers Rahamin Kiosk as the active HDMI playback source so
-Samsung Anynet+ forwards key presses to it. The Wayland compositor hides and
+unsupported-mode message when it is pressed on an HDMI input. The passive CEC
+listener does not announce itself as the active source, avoiding unwanted
+overnight TV power-on and input switching. The Wayland compositor hides and
 parks the pointer after startup; no mouse or X11 cursor utility is required.
 
 The Admin page also provides persistent zoom choices from 50% through 200%.
@@ -141,6 +140,20 @@ this is normally native 1920×1080 at 60 Hz. Chromium keeps a bounded 256 MB dis
 cache for map tiles and page assets, limits renderer processes, and disables
 unneeded background services so repeat page loads are faster without retaining
 all five heavy map pages in memory.
+
+## Pi 4/5 second HDMI display
+
+The Rahamin Admin page can enable an independent Baiamonte dashboard on the
+second HDMI connector of a Raspberry Pi 4 or Pi 5. Connect both TVs before
+enabling it, then open Admin, enable **Baiamonte display on HDMI 2**, confirm the
+dashboard URL (default `http://192.168.0.10:8101`), and save. HDMI 1 retains the
+five-page Rahamin rotation while HDMI 2 keeps Baiamonte loaded continuously.
+
+Each display uses a separate Chromium profile, cache, and supervised process.
+The compositor positions the windows before maximizing them, and the Rahamin
+window is started last so Samsung remote input remains focused on the primary
+kiosk. If either browser exits, the controller rebuilds both displays. Pi 3 and
+Pi Zero safely ignore the second-display setting.
 
 ## GitHub updates
 

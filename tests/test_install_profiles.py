@@ -92,6 +92,8 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("hdmi_force_edid_audio=1", setup)
         self.assertIn("hdmi_group=1", setup)
         self.assertIn("hdmi_mode=16", setup)
+        self.assertIn("wlr-randr", setup)
+        self.assertIn("max_framebuffers=2", setup)
 
     def test_firstboot_explicitly_tries_both_wifi_profiles_without_wizard(self):
         firstboot = (ROOT / "image" / "tv-kiosk-firstboot").read_text(encoding="utf-8")

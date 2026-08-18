@@ -116,6 +116,8 @@ class KioskServerTests(unittest.TestCase):
         self.assertIn("Stop display", body)
         self.assertIn("Reboot Pi", body)
         self.assertIn("Change administrator login", body)
+        self.assertIn("Baiamonte display on HDMI 2", body)
+        self.assertIn("PI 4 / PI 5", body)
 
     def test_baiamonte_admin_documents_arrow_map_zoom(self):
         _token, csrf = self.module.new_session("admin")
@@ -162,6 +164,18 @@ class KioskServerTests(unittest.TestCase):
         self.assertEqual(configured["audio_volume"], 75)
         with self.assertRaises(ValueError):
             self.module.validate_config({**self.config, "audio_volume": 101})
+
+    def test_validates_second_hdmi_baiamonte_settings(self):
+        configured = self.module.validate_config({
+            **self.config,
+            "secondary_display_enabled": True,
+            "secondary_display_url": "http://192.168.0.10:8101",
+            "secondary_zoom_percent": 110,
+        })
+        self.assertTrue(configured["secondary_display_enabled"])
+        self.assertEqual(configured["secondary_zoom_percent"], 110)
+        with self.assertRaises(ValueError):
+            self.module.validate_config({**self.config, "secondary_display_url": "file:///tmp/dashboard"})
 
     def test_validates_full_network_request(self):
         form = {

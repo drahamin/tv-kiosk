@@ -46,11 +46,7 @@ send_action() {
       fi
       ;;
     select)
-      if [ "$KIOSK_VARIANT" = baiamonte ]; then
-        send_key Return
-      else
-        systemctl --user kill --kill-whom=main --signal=SIGUSR1 tv-kiosk-browser.service
-      fi
+      send_key Return
       ;;
     play_pause) send_key space ;;
     zoom_in) send_control_key plus ;;

@@ -6,4 +6,16 @@
       <action name="WarpCursor" x="-1" y="-1" />
     </keybind>
   </keyboard>
+  <windowRules>
+    <!-- Dual-HDMI Pi 4/5 mode launches undecorated app windows.
+         Move them first, then maximize them so each TV receives one kiosk. -->
+    <windowRule identifier="*RahaminPrimary*">
+      <action name="MoveToOutput" output="HDMI-A-1" />
+      <action name="Maximize" />
+    </windowRule>
+    <windowRule identifier="*BaiamonteSecondary*">
+      <action name="MoveToOutput" output="HDMI-A-2" />
+      <action name="Maximize" />
+    </windowRule>
+  </windowRules>
 </labwc_config>

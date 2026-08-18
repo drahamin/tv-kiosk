@@ -55,6 +55,9 @@ def load_config():
         "zoom_percent": int(config.get("zoom_percent", 100)),
         "audio_enabled": bool(config.get("audio_enabled", True)),
         "audio_volume": int(config.get("audio_volume", 60)),
+        "secondary_display_enabled": bool(config.get("secondary_display_enabled", False)),
+        "secondary_display_url": str(config.get("secondary_display_url", "http://192.168.0.10:8101")),
+        "secondary_zoom_percent": int(config.get("secondary_zoom_percent", 100)),
         "pages": [{"name": str(page["name"]), "url": str(page["url"])} for page in pages],
     }
 
@@ -119,7 +122,68 @@ def configure_audio(config):
     )
 
 
-def display_size():
+def hardware_model():
+    override = os.environ.get("KIOSK_HARDWARE_MODEL", "").strip()
+    if override:
+        return override
+    try:
+        return Path("/proc/device-tree/model").read_bytes().rstrip(b"\0").decode()
+    except OSError:
+        return ""
+
+
+def dual_hdmi_capable():
+    model = hardware_model().lower()
+    return "raspberry pi 4" in model or "raspberry pi 5" in model
+
+
+def display_outputs():
+    """Return connected Wayland outputs with their current or preferred size."""
+    try:
+        result = subprocess.run(["wlr-randr"], capture_output=True, text=True, timeout=3, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    outputs = []
+    block = []
+    for line in result.stdout.splitlines():
+        if line and not line[0].isspace():
+            if block:
+                outputs.append(block)
+            block = [line]
+        elif block:
+            block.append(line)
+    if block:
+        outputs.append(block)
+    parsed = []
+    for lines in outputs:
+        name = lines[0].split()[0]
+        text = "\n".join(lines)
+        match = re.search(r"(\d+)x(\d+) px, [^\n]+\((?:current|preferred)[^)]*\)", text)
+        if match:
+            parsed.append({"name": name, "width": int(match.group(1)), "height": int(match.group(2))})
+    return parsed
+
+
+def configure_dual_outputs(config):
+    if KIOSK_VARIANT == "baiamonte" or not config.get("secondary_display_enabled") or not dual_hdmi_capable():
+        return []
+    outputs = display_outputs()
+    hdmi = sorted((item for item in outputs if item["name"].startswith("HDMI-A-")), key=lambda item: item["name"])
+    if len(hdmi) < 2:
+        return []
+    primary, secondary = hdmi[:2]
+    subprocess.run([
+        "wlr-randr",
+        "--output", primary["name"], "--on", "--preferred", "--pos", "0,0",
+        "--output", secondary["name"], "--on", "--preferred", "--pos", f"{primary['width']},0",
+    ], check=False, timeout=8)
+    return [primary, secondary]
+
+
+def display_size(output_name=None):
+    for output in display_outputs():
+        if output_name is None or output["name"] == output_name:
+            return output["width"], output["height"]
     try:
         result = subprocess.run(["wlr-randr"], capture_output=True, text=True, timeout=3, check=False)
         match = re.search(r"(\d+)x(\d+) px, [^\n]+\(current\)", result.stdout)
@@ -130,12 +194,13 @@ def display_size():
     return 1920, 1080
 
 
-def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None):
-    profile = STATE_DIR / "chromium-profile"
-    cache = STATE_DIR / "chromium-cache"
+def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None, role="primary", url=None, output_name=None, dual=False):
+    suffix = "" if role == "primary" else f"-{role}"
+    profile = STATE_DIR / f"chromium-profile{suffix}"
+    cache = STATE_DIR / f"chromium-cache{suffix}"
     profile.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
-    width, height = display_size()
+    width, height = display_size(output_name)
     profile_name = hardware_profile or HARDWARE_PROFILE
     renderer_limit = 1 if profile_name == "zero" else 3
     cache_size = 134217728 if profile_name == "zero" else 268435456
@@ -146,9 +211,8 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None)
         f"--user-data-dir={profile}",
         f"--disk-cache-dir={cache}",
         "--remote-debugging-address=127.0.0.1",
-        f"--remote-debugging-port={DEBUG_PORT}",
-        "--kiosk",
-        "--start-fullscreen",
+        f"--remote-debugging-port={DEBUG_PORT if role == 'primary' else DEBUG_PORT + 1}",
+        f"--class={'RahaminPrimary' if role == 'primary' else 'BaiamonteSecondary'}",
         "--start-maximized",
         "--window-position=0,0",
         f"--window-size={width},{height}",
@@ -166,8 +230,13 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None)
         f"--disk-cache-size={cache_size}",
         "--disable-pinch",
         "--overscroll-history-navigation=0",
-        f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile={quote(profile_name)}&variant={quote(KIOSK_VARIANT)}",
     ]
+    start_url = url or f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile={quote(profile_name)}&variant={quote(KIOSK_VARIANT)}"
+    if dual:
+        command.append(f"--app={start_url}")
+    else:
+        command[command.index("--start-maximized"):command.index("--start-maximized")] = ["--kiosk", "--start-fullscreen"]
+        command.append(start_url)
     if profile_name == "zero":
         command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", "--js-flags=--max-old-space-size=192"]
     if not audio_enabled:
@@ -225,7 +294,26 @@ def supervise():
     while running:
         launch_config = load_config()
         configure_audio(launch_config)
-        process = launch_chromium(launch_config["zoom_percent"], launch_config["audio_enabled"])
+        outputs = configure_dual_outputs(launch_config)
+        dual = len(outputs) == 2
+        secondary_process = None
+        if dual:
+            secondary_process = launch_chromium(
+                launch_config.get("secondary_zoom_percent", 100),
+                False,
+                role="secondary",
+                url=launch_config.get("secondary_display_url", "http://192.168.0.10:8101"),
+                output_name=outputs[1]["name"],
+                dual=True,
+            )
+            time.sleep(1)
+        process = launch_chromium(
+            launch_config["zoom_percent"],
+            launch_config["audio_enabled"],
+            role="primary",
+            output_name=outputs[0]["name"] if dual else None,
+            dual=dual,
+        )
         launched_at = time.monotonic()
         tab_id = None
         try:
@@ -238,8 +326,15 @@ def supervise():
             next_rotation = 0
             while running and process.poll() is None:
                 config = load_config()
+                if secondary_process is not None and secondary_process.poll() is not None:
+                    print("Baiamonte second display exited; restarting both displays", flush=True)
+                    break
                 if config["zoom_percent"] != launch_config["zoom_percent"] or config["audio_enabled"] != launch_config["audio_enabled"]:
                     print("Display scale or audio mode changed; restarting Chromium", flush=True)
+                    break
+                secondary_settings = ("secondary_display_enabled", "secondary_display_url", "secondary_zoom_percent")
+                if any(config.get(key) != launch_config.get(key) for key in secondary_settings):
+                    print("Second HDMI settings changed; rebuilding the display layout", flush=True)
                     break
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
@@ -267,12 +362,14 @@ def supervise():
         except Exception as exc:
             print(f"Kiosk browser controller: {exc}", flush=True)
         finally:
-            if process.poll() is None:
-                process.terminate()
+            for browser in (process, secondary_process):
+                if browser is None or browser.poll() is not None:
+                    continue
+                browser.terminate()
                 try:
-                    process.wait(timeout=8)
+                    browser.wait(timeout=8)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    browser.kill()
         if running:
             time.sleep(3)
 

@@ -100,6 +100,15 @@ hdmi_group=1
 hdmi_mode=16
 max_framebuffers=1
 EOF
+  else
+    case "$(tr -d '\000' </proc/device-tree/model 2>/dev/null || true)" in
+      *"Raspberry Pi 4"*|*"Raspberry Pi 5"*)
+        cat >> "$BOOT_CONFIG" <<'EOF'
+# Two scanout framebuffers allow independent Rahamin and Baiamonte HDMI TVs.
+max_framebuffers=2
+EOF
+        ;;
+    esac
   fi
   cat >> "$BOOT_CONFIG" <<'EOF'
 # END Rahamin Kiosk HDMI
@@ -112,9 +121,9 @@ if [ "$KIOSK_HARDWARE_PROFILE" = zero ] && ! command -v cog >/dev/null 2>&1; the
 elif [ "$KIOSK_HARDWARE_PROFILE" != zero ] && ! command -v chromium >/dev/null 2>&1; then
   BROWSER_PACKAGE=chromium
 fi
-if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || [ -n "$BROWSER_PACKAGE" ]; then
+if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || ! command -v wlr-randr >/dev/null 2>&1 || [ -n "$BROWSER_PACKAGE" ]; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc wtype $BROWSER_PACKAGE
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc wlr-randr wtype $BROWSER_PACKAGE
 fi
 
 # Older builds selected Openbox even though the optimized Chromium and CEC

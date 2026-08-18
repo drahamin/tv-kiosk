@@ -101,6 +101,37 @@ class BrowserControllerTests(unittest.TestCase):
         with patch.object(controller.subprocess, "run", return_value=result):
             self.assertEqual(controller.display_size(), (3840, 2160))
 
+    def test_pi_four_dual_hdmi_uses_isolated_baiamonte_app(self):
+        fake = MagicMock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+            controller.launch_chromium(110, False, role="secondary", url="http://192.168.0.10:8101", output_name="HDMI-A-2", dual=True)
+        command = popen.call_args.args[0]
+        self.assertIn("--class=BaiamonteSecondary", command)
+        self.assertIn("--remote-debugging-port=9223", command)
+        self.assertIn("--app=http://192.168.0.10:8101", command)
+        self.assertIn("--mute-audio", command)
+        self.assertTrue(any("chromium-profile-secondary" in item for item in command))
+        self.assertNotIn("--kiosk", command)
+
+    def test_second_hdmi_is_limited_to_pi_four_and_five(self):
+        with patch.dict(controller.os.environ, {"KIOSK_HARDWARE_MODEL": "Raspberry Pi 4 Model B Rev 1.5"}):
+            self.assertTrue(controller.dual_hdmi_capable())
+        with patch.dict(controller.os.environ, {"KIOSK_HARDWARE_MODEL": "Raspberry Pi 5 Model B Rev 1.0"}):
+            self.assertTrue(controller.dual_hdmi_capable())
+        with patch.dict(controller.os.environ, {"KIOSK_HARDWARE_MODEL": "Raspberry Pi 3 Model B Rev 1.2"}):
+            self.assertFalse(controller.dual_hdmi_capable())
+
+    def test_dual_output_parser_keeps_both_hdmi_connectors(self):
+        result = MagicMock(stdout=(
+            "HDMI-A-1\n  1920x1080 px, 60.000000 Hz (current, preferred)\n  Position: 0,0\n"
+            "HDMI-A-2\n  3840x2160 px, 30.000000 Hz (current, preferred)\n  Position: 1920,0\n"
+        ))
+        with patch.object(controller.subprocess, "run", return_value=result):
+            self.assertEqual(controller.display_outputs(), [
+                {"name": "HDMI-A-1", "width": 1920, "height": 1080},
+                {"name": "HDMI-A-2", "width": 3840, "height": 2160},
+            ])
+
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = b"Target activated"
