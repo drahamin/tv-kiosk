@@ -117,7 +117,7 @@ class KioskServerTests(unittest.TestCase):
         self.assertIn("Reboot Pi", body)
         self.assertIn("Change administrator login", body)
 
-    def test_baiamonte_admin_documents_map_only_zoom(self):
+    def test_baiamonte_admin_documents_arrow_map_zoom(self):
         _token, csrf = self.module.new_session("admin")
         original = self.module.KIOSK_VARIANT
         try:
@@ -125,7 +125,9 @@ class KioskServerTests(unittest.TestCase):
             body = self.module.admin_page(self.config, {"username": "admin", "csrf": csrf})
         finally:
             self.module.KIOSK_VARIANT = original
-        self.assertIn("Play/Pause advances only the active map zoom", body)
+        self.assertIn("Left/Right change pages", body)
+        self.assertIn("Up/Down zoom only the active ADS-B, AIS, or weather map", body)
+        self.assertIn("Play/Pause pauses or resumes rotation", body)
         self.assertIn("Volume and Channel rockers", body)
 
     def test_rejects_non_http_page_url(self):

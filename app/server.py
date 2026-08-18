@@ -545,7 +545,7 @@ def admin_page(config, session, message="", error=False, snapshot=None):
         setup_label = "Setup complete — show the rotating pages"
         tv_keyboard = ""
     if KIOSK_VARIANT == "baiamonte":
-        remote_help = "arrows and OK navigate; on ADS-B, AIS, and weather pages Play/Pause advances only the active map zoom. Samsung reserves the Volume and Channel rockers for television functions."
+        remote_help = "Left/Right change pages; Up/Down zoom only the active ADS-B, AIS, or weather map; OK activates controls; Play/Pause pauses or resumes rotation. Samsung reserves the Volume and Channel rockers for television functions."
     else:
         remote_help = "arrows and OK navigate, Play/Pause controls media, Fast-forward/Rewind zoom in/out, and Stop resets zoom to 100%. Samsung reserves the Channel rocker for television functions."
     content = f"""<main><section class="hero"><span class="eyebrow">SAMSUNG 75-INCH DISPLAY</span><h1>Rahamin Kiosk control center</h1><p>Manage the playlist, test every source, review the Pi and network, and keep the display healthy.</p></section>{notice}
