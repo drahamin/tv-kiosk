@@ -24,7 +24,16 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn('--kill-whom=main --signal=SIGUSR1 tv-kiosk-browser.service', script)
         self.assertIn('--kill-whom=main --signal=SIGUSR2 tv-kiosk-browser.service', script)
         self.assertIn("cec-client -t p -d 31", script)
-        self.assertIn("printf 'as\\n'", script)
+        self.assertIn("</dev/null", script)
+        self.assertNotIn("printf 'as\\n'", script)
+
+    def test_remote_restart_never_wakes_or_selects_the_tv(self):
+        script = (ROOT / "scripts" / "rahamin-kiosk-remote").read_text(encoding="utf-8")
+        self.assertNotIn("printf 'as\\n'", script)
+        self.assertNotIn("echo 'as'", script)
+        self.assertNotIn("echo as", script)
+        self.assertNotIn("on 0", script)
+        self.assertNotIn("tx 10:04", script)
 
     def test_remote_service_waits_for_wayland(self):
         unit = (ROOT / "systemd" / "tv-kiosk-remote.service").read_text(encoding="utf-8")

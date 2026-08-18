@@ -61,9 +61,11 @@ send_action() {
 
 echo "Rahamin Kiosk Samsung remote listener starting"
 while :; do
-  # Register as a playback device and active source so Samsung Anynet+ sends
-  # remote presses to the Pi. Debug events are required for "key pressed".
-  printf 'as\n' | cec-client -t p -d 31 -o "Rahamin Kiosk" 2>&1 | while IFS= read -r line; do
+  # Register passively as a playback device. Do not send libCEC's `as`
+  # (active-source) command here: it powers on many Samsung TVs and selects
+  # the Pi's HDMI input whenever this service or the GitHub updater restarts.
+  # When the TV is already on this listener still receives its Anynet+ keys.
+  cec-client -t p -d 31 -o "Rahamin Kiosk" </dev/null 2>&1 | while IFS= read -r line; do
     case "$line" in
       # libCEC 6 and 7 format key events differently. Accept both forms and
       # suppress the duplicate detail/canonical pair emitted for each press.
