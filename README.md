@@ -85,7 +85,8 @@ The kiosk listens for the Samsung television remote through Anynet+ (HDMI-CEC),
 with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
 
 - arrows and OK to navigate the active web page;
-- Play/Pause to control page media;
+- on Baiamonte ADS-B, AIS, and weather pages, Play/Pause advances the active map zoom;
+- on Rahamin displays, Play/Pause controls page media;
 - Fast-forward and Rewind to zoom in and out;
 - Stop to reset browser zoom to 100%.
 

@@ -12,6 +12,7 @@ class RemoteControlTests(unittest.TestCase):
             self.assertIn(command, script)
         self.assertIn('send_control_key plus', script)
         self.assertIn('send_control_key minus', script)
+        self.assertIn('send_control_key 0', script)
         self.assertIn('key pressed: fast forward', script)
         self.assertIn('key pressed: rewind', script)
         self.assertIn('key pressed: stop', script)
@@ -48,6 +49,7 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn("send_key left", script)
         self.assertIn("send_key right", script)
         self.assertIn("send_key Return", script)
+        self.assertIn('play_pause) send_key space', script)
         self.assertIn("EnvironmentFile=-/etc/tv-kiosk/kiosk.env", unit)
 
     def test_labwc_hides_and_warps_cursor(self):
