@@ -202,7 +202,7 @@ def display_size(output_name=None):
     return 1920, 1080
 
 
-def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None, role="primary", url=None, output_name=None, dual=False):
+def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None, role="primary", url=None, output_name=None, output_x=0, dual=False):
     suffix = "" if role == "primary" else f"-{role}"
     profile = STATE_DIR / f"chromium-profile{suffix}"
     cache = STATE_DIR / f"chromium-cache{suffix}"
@@ -215,7 +215,7 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
     cache_size = 134217728 if constrained else 268435456
     command = [
         CHROMIUM,
-        "--ozone-platform=wayland",
+        f"--ozone-platform={'x11' if dual else 'wayland'}",
         "--password-store=basic",
         f"--user-data-dir={profile}",
         f"--disk-cache-dir={cache}",
@@ -223,7 +223,7 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
         f"--remote-debugging-port={DEBUG_PORT if role == 'primary' else DEBUG_PORT + 1}",
         f"--class={'RahaminPrimary' if role == 'primary' else 'BaiamonteSecondary'}",
         "--start-maximized",
-        "--window-position=0,0",
+        f"--window-position={output_x},0",
         f"--window-size={width},{height}",
         f"--force-device-scale-factor={zoom_percent / 100:g}",
         "--autoplay-policy=no-user-gesture-required",
@@ -314,6 +314,7 @@ def supervise():
                 role="secondary",
                 url=launch_config.get("secondary_display_url", "http://192.168.0.10:8101"),
                 output_name=outputs[1]["name"],
+                output_x=outputs[0]["width"],
                 dual=True,
             )
             time.sleep(1)

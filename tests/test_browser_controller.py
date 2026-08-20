@@ -116,11 +116,13 @@ class BrowserControllerTests(unittest.TestCase):
     def test_pi_four_dual_hdmi_uses_isolated_baiamonte_app(self):
         fake = MagicMock()
         with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
-            controller.launch_chromium(110, False, role="secondary", url="http://192.168.0.10:8101", output_name="HDMI-A-2", dual=True)
+            controller.launch_chromium(110, False, role="secondary", url="http://192.168.0.10:8101", output_name="HDMI-A-2", output_x=1920, dual=True)
         command = popen.call_args.args[0]
         self.assertIn("--class=BaiamonteSecondary", command)
         self.assertIn("--remote-debugging-port=9223", command)
         self.assertIn("--app=http://192.168.0.10:8101", command)
+        self.assertIn("--ozone-platform=x11", command)
+        self.assertIn("--window-position=1920,0", command)
         self.assertIn("--mute-audio", command)
         self.assertTrue(any("chromium-profile-secondary" in item for item in command))
         self.assertNotIn("--kiosk", command)

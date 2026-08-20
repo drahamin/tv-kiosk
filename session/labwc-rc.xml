@@ -17,5 +17,12 @@
       <action name="MoveToOutput" output="HDMI-A-2" />
       <action name="Maximize" />
     </windowRule>
+    <!-- Chromium's native Wayland app-id varies across releases. The dual
+         mode uses XWayland for deterministic coordinates, with this title
+         rule retained as a safe placement fallback. -->
+    <windowRule title="*Tenuta Baiamonte Live*">
+      <action name="MoveToOutput" output="HDMI-A-2" />
+      <action name="Maximize" />
+    </windowRule>
   </windowRules>
 </labwc_config>
