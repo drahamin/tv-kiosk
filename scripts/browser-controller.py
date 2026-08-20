@@ -259,7 +259,6 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
         "--remote-debugging-address=127.0.0.1",
         f"--remote-debugging-port={DEBUG_PORT if role == 'primary' else DEBUG_PORT + 1}",
         f"--class={'RahaminPrimary' if role == 'primary' else 'BaiamonteSecondary'}",
-        "--start-maximized",
         f"--window-position={output_x},0",
         f"--window-size={width},{height}",
         f"--force-device-scale-factor={zoom_percent / 100:g}",
@@ -281,7 +280,7 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
     if dual:
         command.append(f"--app={start_url}")
     else:
-        command[command.index("--start-maximized"):command.index("--start-maximized")] = ["--kiosk", "--start-fullscreen"]
+        command[1:1] = ["--kiosk", "--start-fullscreen", "--start-maximized"]
         command.append(start_url)
     if constrained:
         heap_size = 192 if profile_name == "zero" else 256

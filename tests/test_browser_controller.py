@@ -124,6 +124,7 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--ozone-platform=x11", command)
         self.assertIn("--window-position=1920,0", command)
         self.assertIn("--mute-audio", command)
+        self.assertNotIn("--start-maximized", command)
         self.assertTrue(any("chromium-profile-secondary" in item for item in command))
         self.assertNotIn("--kiosk", command)
 
