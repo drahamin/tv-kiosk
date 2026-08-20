@@ -163,6 +163,11 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertTrue(any(command[:5] == ["xdotool", "windowmove", "--sync", "202", "1920"] for command in commands))
         self.assertFalse(any("windowstate" in command for command in commands))
 
+    def test_dual_geometry_is_reasserted_after_page_navigation(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("next_geometry_check", source)
+        self.assertIn("place_dual_windows(outputs, process, secondary_process)", source)
+
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = b"Target activated"

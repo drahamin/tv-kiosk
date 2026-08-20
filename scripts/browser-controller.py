@@ -374,6 +374,7 @@ def supervise():
             fingerprint = None
             current = 0
             next_rotation = 0
+            next_geometry_check = 0
             while running and process.poll() is None:
                 config = load_config()
                 if secondary_process is not None and secondary_process.poll() is not None:
@@ -408,6 +409,13 @@ def supervise():
                     tab_id = replace_tab(config["pages"][current]["url"], tab_id)
                     print(f"Showing page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
+                # Chromium can reapply the desktop work-area geometry when a
+                # newly navigated app page changes its native window title.
+                # Reassert the two exact HDMI canvases so no panel or border
+                # can reappear later in the rotation.
+                if dual and time.monotonic() >= next_geometry_check:
+                    place_dual_windows(outputs, process, secondary_process)
+                    next_geometry_check = time.monotonic() + 5
                 time.sleep(1)
         except Exception as exc:
             print(f"Kiosk browser controller: {exc}", flush=True)
