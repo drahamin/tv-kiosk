@@ -95,6 +95,8 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("wlr-randr", setup)
         self.assertIn("xdotool", setup)
         self.assertIn("max_framebuffers=2", setup)
+        self.assertIn("video=HDMI-A-1:3840x2160@30D", setup)
+        self.assertIn("video=HDMI-A-2:3840x2160@30D", setup)
 
     def test_pi_four_and_five_enable_second_display_once(self):
         setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")

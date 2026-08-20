@@ -146,6 +146,33 @@ EOF
 EOF
 fi
 
+# Full KMS on current Raspberry Pi OS does not consistently honor the legacy
+# hdmi_force_hotplug setting after a Samsung TV drops HPD. Force both digital
+# connectors into the last verified stable dual-TV mode on Rahamin Pi 4/5
+# units. This keeps the compositor's two-output layout present while either TV
+# is booting, changing inputs, or briefly sleeping.
+BOOT_CMDLINE=/boot/firmware/cmdline.txt
+[ -f "$BOOT_CMDLINE" ] || BOOT_CMDLINE=/boot/cmdline.txt
+if [ -f "$BOOT_CMDLINE" ] && [ "${KIOSK_VARIANT:-auto}" = rahamin ]; then
+  case "$HARDWARE_MODEL" in
+    *"Raspberry Pi 4"*|*"Raspberry Pi 5"*) ;;
+    *) BOOT_CMDLINE= ;;
+  esac
+fi
+if [ -n "$BOOT_CMDLINE" ] && [ -f "$BOOT_CMDLINE" ]; then
+  python3 - "$BOOT_CMDLINE" "${KIOSK_VARIANT:-auto}" "$HARDWARE_MODEL" <<'PY'
+import sys
+
+path, variant, model = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    tokens = handle.read().split()
+tokens = [token for token in tokens if not token.startswith(("video=HDMI-A-1:", "video=HDMI-A-2:"))]
+tokens.extend(("video=HDMI-A-1:3840x2160@30D", "video=HDMI-A-2:3840x2160@30D"))
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(" ".join(tokens) + "\n")
+PY
+fi
+
 BROWSER_PACKAGE=
 if [ "$KIOSK_HARDWARE_PROFILE" = zero ] && ! command -v cog >/dev/null 2>&1; then
   BROWSER_PACKAGE=cog
