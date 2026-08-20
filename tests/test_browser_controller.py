@@ -54,6 +54,18 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--js-flags=--max-old-space-size=192", command)
         self.assertTrue(command[-1].endswith("/session/boot.html?profile=zero&variant=auto"))
 
+    def test_baiamonte_pi_three_uses_constrained_chromium(self):
+        fake = MagicMock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "KIOSK_VARIANT", "baiamonte"), patch.object(controller, "hardware_model", return_value="Raspberry Pi 3 Model B Rev 1.2"), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
+            controller.launch_chromium(100, True, hardware_profile="multi")
+        command = popen.call_args.args[0]
+        self.assertIn("--enable-low-end-device-mode", command)
+        self.assertIn("--disable-smooth-scrolling", command)
+        self.assertIn("--process-per-site", command)
+        self.assertIn("--renderer-process-limit=2", command)
+        self.assertIn("--disk-cache-size=134217728", command)
+        self.assertIn("--js-flags=--max-old-space-size=256", command)
+
     def test_pi_zero_uses_armv6_compatible_fullscreen_cog(self):
         fake = MagicMock()
         with patch.object(controller.subprocess, "Popen", return_value=fake) as popen:

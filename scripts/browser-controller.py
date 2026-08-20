@@ -137,6 +137,14 @@ def dual_hdmi_capable():
     return "raspberry pi 4" in model or "raspberry pi 5" in model
 
 
+def constrained_chromium(profile_name):
+    """Use a lean Chromium process model on Zero and Baiamonte Pi 3 units."""
+    if profile_name == "zero":
+        return True
+    model = hardware_model().lower()
+    return KIOSK_VARIANT == "baiamonte" and "raspberry pi 3" in model
+
+
 def display_outputs():
     """Return connected Wayland outputs with their current or preferred size."""
     try:
@@ -202,8 +210,9 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
     cache.mkdir(parents=True, exist_ok=True)
     width, height = display_size(output_name)
     profile_name = hardware_profile or HARDWARE_PROFILE
-    renderer_limit = 1 if profile_name == "zero" else 3
-    cache_size = 134217728 if profile_name == "zero" else 268435456
+    constrained = constrained_chromium(profile_name)
+    renderer_limit = 1 if profile_name == "zero" else (2 if constrained else 3)
+    cache_size = 134217728 if constrained else 268435456
     command = [
         CHROMIUM,
         "--ozone-platform=wayland",
@@ -237,8 +246,9 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
     else:
         command[command.index("--start-maximized"):command.index("--start-maximized")] = ["--kiosk", "--start-fullscreen"]
         command.append(start_url)
-    if profile_name == "zero":
-        command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", "--js-flags=--max-old-space-size=192"]
+    if constrained:
+        heap_size = 192 if profile_name == "zero" else 256
+        command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", f"--js-flags=--max-old-space-size={heap_size}"]
     if not audio_enabled:
         command.insert(-1, "--mute-audio")
     return subprocess.Popen(command)
