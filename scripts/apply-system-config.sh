@@ -153,7 +153,9 @@ fi
 # is booting, changing inputs, or briefly sleeping.
 BOOT_CMDLINE=/boot/firmware/cmdline.txt
 [ -f "$BOOT_CMDLINE" ] || BOOT_CMDLINE=/boot/cmdline.txt
-if [ -f "$BOOT_CMDLINE" ] && [ "${KIOSK_VARIANT:-auto}" = rahamin ]; then
+if [ "${KIOSK_VARIANT:-auto}" != rahamin ]; then
+  BOOT_CMDLINE=
+elif [ -f "$BOOT_CMDLINE" ]; then
   case "$HARDWARE_MODEL" in
     *"Raspberry Pi 4"*|*"Raspberry Pi 5"*) ;;
     *) BOOT_CMDLINE= ;;
