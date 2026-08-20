@@ -19,6 +19,37 @@ if [ -z "${KIOSK_HARDWARE_PROFILE:-}" ]; then
   printf 'KIOSK_HARDWARE_PROFILE=%s\n' "$KIOSK_HARDWARE_PROFILE" >> /etc/tv-kiosk/kiosk.env
 fi
 
+# The first dual-HDMI Rahamin release exposed HDMI 2 in Admin but left the
+# shipped five-page configuration disabled. Enable it exactly once on Pi 4/5
+# installations. The marker prevents later updates from undoing a deliberate
+# manual disable in Admin.
+HARDWARE_MODEL=${HARDWARE_MODEL:-$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')}
+DUAL_HDMI_DEFAULT_MARKER="$STATE_DIR/dual-hdmi-default-v1"
+KIOSK_CONFIG="/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
+case "${KIOSK_VARIANT:-auto}:$HARDWARE_MODEL" in
+  rahamin:*"Raspberry Pi 4"*|rahamin:*"Raspberry Pi 5"*)
+    if [ ! -e "$DUAL_HDMI_DEFAULT_MARKER" ] && [ -f "$KIOSK_CONFIG" ]; then
+      python3 - "$KIOSK_CONFIG" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    config = json.load(handle)
+config["secondary_display_enabled"] = True
+config.setdefault("secondary_display_url", "http://192.168.0.10:8101")
+config.setdefault("secondary_zoom_percent", 100)
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(config, handle, indent=2)
+    handle.write("\n")
+PY
+      chown "$KIOSK_USER:$KIOSK_USER" "$KIOSK_CONFIG"
+    fi
+    install -d -m 0755 "$STATE_DIR"
+    touch "$DUAL_HDMI_DEFAULT_MARKER"
+    ;;
+esac
+
 # Current Raspberry Pi OS Lite releases do not always consume userconf.txt
 # before this root-owned first-boot installer runs. In that case useradd creates
 # the kiosk account with a locked shadow entry. LightDM may start the first

@@ -95,6 +95,13 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("wlr-randr", setup)
         self.assertIn("max_framebuffers=2", setup)
 
+    def test_pi_four_and_five_enable_second_display_once(self):
+        setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        self.assertIn("dual-hdmi-default-v1", setup)
+        self.assertIn('config["secondary_display_enabled"] = True', setup)
+        self.assertIn('rahamin:*"Raspberry Pi 4"*', setup)
+        self.assertIn('rahamin:*"Raspberry Pi 5"*', setup)
+
     def test_firstboot_explicitly_tries_both_wifi_profiles_without_wizard(self):
         firstboot = (ROOT / "image" / "tv-kiosk-firstboot").read_text(encoding="utf-8")
         unit = (ROOT / "image" / "tv-kiosk-firstboot.service").read_text(encoding="utf-8")
