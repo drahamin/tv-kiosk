@@ -166,6 +166,11 @@ class BrowserControllerTests(unittest.TestCase):
         with patch.object(controller, "urlopen", return_value=response):
             self.assertEqual(controller.devtools("/json/activate/example"), "Target activated")
 
+    def test_chromium_startup_allows_slow_dual_4k_profiles(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("range(240)", source)
+        self.assertIn("wait_for_chromium(secondary_process, DEBUG_PORT + 1)", source)
+
     def test_replace_tab_keeps_only_one_full_page_loaded(self):
         targets = [
             {"id": "new", "type": "page"},

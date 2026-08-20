@@ -62,8 +62,8 @@ def load_config():
     }
 
 
-def devtools(path, method="GET", timeout=3):
-    request = Request(f"http://127.0.0.1:{DEBUG_PORT}{path}", method=method)
+def devtools(path, method="GET", timeout=3, port=DEBUG_PORT):
+    request = Request(f"http://127.0.0.1:{port}{path}", method=method)
     with urlopen(request, timeout=timeout) as response:
         payload = response.read()
     if not payload:
@@ -74,12 +74,15 @@ def devtools(path, method="GET", timeout=3):
         return payload.decode("utf-8", errors="replace")
 
 
-def wait_for_chromium(process):
-    for _attempt in range(80):
+def wait_for_chromium(process, port=DEBUG_PORT):
+    # Two independent 4K profiles can take longer on their first launch while
+    # Chromium initializes caches. Avoid a destructive retry loop by allowing
+    # each browser a full minute and starting the displays sequentially.
+    for _attempt in range(240):
         if process.poll() is not None:
             raise RuntimeError("Chromium exited before its control port was ready")
         try:
-            devtools("/json/version")
+            devtools("/json/version", port=port)
             return
         except (OSError, URLError, ValueError):
             time.sleep(0.25)
@@ -356,7 +359,8 @@ def supervise():
                 output_x=outputs[0]["width"],
                 dual=True,
             )
-            time.sleep(1)
+            wait_for_chromium(secondary_process, DEBUG_PORT + 1)
+            time.sleep(0.5)
         process = launch_chromium(
             launch_config["zoom_percent"],
             launch_config["audio_enabled"],
