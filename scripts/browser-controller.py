@@ -202,6 +202,45 @@ def display_size(output_name=None):
     return 1920, 1080
 
 
+def place_dual_windows(outputs):
+    """Place and fullscreen both XWayland app windows after they are mapped."""
+    if len(outputs) != 2:
+        return False
+    placements = (
+        ("RahaminPrimary", outputs[0], 0),
+        ("BaiamonteSecondary", outputs[1], outputs[0]["width"]),
+    )
+    for _attempt in range(40):
+        windows = []
+        for class_name, output, x_position in placements:
+            try:
+                found = subprocess.run(
+                    ["xdotool", "search", "--onlyvisible", "--class", class_name],
+                    capture_output=True, text=True, timeout=2, check=False,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return False
+            ids = [item for item in found.stdout.split() if item.isdigit()]
+            if not ids:
+                break
+            windows.append((ids[-1], output, x_position))
+        if len(windows) == 2:
+            for window_id, output, x_position in windows:
+                subprocess.run([
+                    "xdotool", "windowstate", "--remove", "MAXIMIZED_VERT",
+                    "--remove", "MAXIMIZED_HORZ", window_id,
+                ], check=False, timeout=3)
+                subprocess.run([
+                    "xdotool", "windowmove", "--sync", window_id, str(x_position), "0",
+                    "windowsize", "--sync", window_id, str(output["width"]), str(output["height"]),
+                    "windowstate", "--add", "FULLSCREEN", window_id,
+                ], check=False, timeout=5)
+            subprocess.run(["xdotool", "windowraise", windows[0][0]], check=False, timeout=3)
+            return True
+        time.sleep(0.25)
+    return False
+
+
 def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None, role="primary", url=None, output_name=None, output_x=0, dual=False):
     suffix = "" if role == "primary" else f"-{role}"
     profile = STATE_DIR / f"chromium-profile{suffix}"
@@ -329,6 +368,8 @@ def supervise():
         tab_id = None
         try:
             wait_for_chromium(process)
+            if dual and not place_dual_windows(outputs):
+                print("Could not confirm dual-window placement; compositor rules remain active", flush=True)
             remaining_boot_time = BOOT_MIN_SECONDS - (time.monotonic() - launched_at)
             if remaining_boot_time > 0:
                 time.sleep(remaining_boot_time)

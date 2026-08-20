@@ -146,6 +146,20 @@ class BrowserControllerTests(unittest.TestCase):
                 {"name": "HDMI-A-2", "width": 3840, "height": 2160},
             ])
 
+    def test_dual_window_placement_moves_and_fullscreens_both_classes(self):
+        outputs = [
+            {"name": "HDMI-A-1", "width": 1920, "height": 1080},
+            {"name": "HDMI-A-2", "width": 3840, "height": 2160},
+        ]
+        searches = [MagicMock(stdout="101\n"), MagicMock(stdout="202\n")]
+        with patch.object(controller.subprocess, "run", side_effect=searches + [MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock()]) as run:
+            self.assertTrue(controller.place_dual_windows(outputs))
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertIn(["xdotool", "search", "--onlyvisible", "--class", "RahaminPrimary"], commands)
+        self.assertIn(["xdotool", "search", "--onlyvisible", "--class", "BaiamonteSecondary"], commands)
+        self.assertTrue(any(command[:5] == ["xdotool", "windowmove", "--sync", "202", "1920"] for command in commands))
+        self.assertTrue(any("FULLSCREEN" in command for command in commands))
+
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()
         response.__enter__.return_value.read.return_value = b"Target activated"

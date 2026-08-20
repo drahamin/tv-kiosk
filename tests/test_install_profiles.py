@@ -93,6 +93,7 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("hdmi_group=1", setup)
         self.assertIn("hdmi_mode=16", setup)
         self.assertIn("wlr-randr", setup)
+        self.assertIn("xdotool", setup)
         self.assertIn("max_framebuffers=2", setup)
 
     def test_pi_four_and_five_enable_second_display_once(self):
