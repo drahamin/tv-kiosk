@@ -8,7 +8,7 @@ import subprocess
 import time
 import re
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -24,6 +24,8 @@ KIOSK_VARIANT = os.environ.get("KIOSK_VARIANT", "auto").strip().lower()
 running = True
 requested_step = 0
 BOOT_MIN_SECONDS = 4
+PAGE_RETRY_SECONDS = 15
+PAGE_HEALTH_SECONDS = 30
 
 
 def stop(_signum, _frame):
@@ -89,31 +91,56 @@ def wait_for_chromium(process, port=DEBUG_PORT):
     raise RuntimeError("Chromium control port did not become ready")
 
 
-def open_tab(url):
-    return devtools(f"/json/new?{quote(url, safe='')}", method="PUT")
+def open_tab(url, port=DEBUG_PORT):
+    return devtools(f"/json/new?{quote(url, safe='')}", method="PUT", port=port)
 
 
-def activate(tab_id):
-    devtools(f"/json/activate/{tab_id}")
+def activate(tab_id, port=DEBUG_PORT):
+    devtools(f"/json/activate/{tab_id}", port=port)
 
 
-def close(tab_id):
+def close(tab_id, port=DEBUG_PORT):
     try:
-        devtools(f"/json/close/{tab_id}")
+        devtools(f"/json/close/{tab_id}", port=port)
     except (OSError, URLError, ValueError):
         pass
 
 
-def replace_tab(url, old_id=None):
-    target = open_tab(url)
+def replace_tab(url, old_id=None, port=DEBUG_PORT):
+    target = open_tab(url, port=port)
     new_id = target["id"]
-    activate(new_id)
+    activate(new_id, port=port)
     if old_id and old_id != new_id:
-        close(old_id)
-    for target in devtools("/json/list"):
+        close(old_id, port=port)
+    for target in devtools("/json/list", port=port):
         if target.get("type") == "page" and target.get("id") != new_id:
-            close(target["id"])
+            close(target["id"], port=port)
     return new_id
+
+
+def page_reachable(url, timeout=6):
+    """Return true when a web server is reachable, including auth/error responses."""
+    if not str(url).lower().startswith(("http://", "https://")):
+        return True
+    request = Request(str(url), method="HEAD", headers={"User-Agent": "Rahamin-Kiosk/1"})
+    try:
+        with urlopen(request, timeout=timeout):
+            return True
+    except HTTPError:
+        # A 401, 403, or 405 still proves that the web server is available.
+        return True
+    except (OSError, URLError, ValueError):
+        return False
+
+
+def wait_for_page(url, process):
+    """Keep the branded boot view up until a single-page kiosk is reachable."""
+    while running and process.poll() is None:
+        if page_reachable(url):
+            return True
+        print(f"Page unavailable; retrying in {PAGE_RETRY_SECONDS} seconds: {url}", flush=True)
+        time.sleep(PAGE_RETRY_SECONDS)
+    return False
 
 
 def configure_audio(config):
@@ -346,16 +373,22 @@ def supervise():
         outputs = configure_dual_outputs(launch_config)
         dual = len(outputs) == 2
         secondary_process = None
+        secondary_tab_id = None
+        secondary_url = launch_config.get("secondary_display_url", "http://192.168.0.10:8101")
+        secondary_waiting = False
         if dual:
+            secondary_ready = page_reachable(secondary_url)
+            secondary_boot_url = f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile=multi&variant=baiamonte"
             secondary_process = launch_chromium(
                 launch_config.get("secondary_zoom_percent", 100),
                 False,
                 role="secondary",
-                url=launch_config.get("secondary_display_url", "http://192.168.0.10:8101"),
+                url=secondary_url if secondary_ready else secondary_boot_url,
                 output_name=outputs[1]["name"],
                 output_x=outputs[0]["width"],
                 dual=True,
             )
+            secondary_waiting = not secondary_ready
             wait_for_chromium(secondary_process, DEBUG_PORT + 1)
             time.sleep(0.5)
         process = launch_chromium(
@@ -378,6 +411,10 @@ def supervise():
             current = 0
             next_rotation = 0
             next_geometry_check = 0
+            next_page_health_check = 0
+            next_secondary_retry = 0
+            current_page_was_unreachable = False
+            secondary_was_unreachable = secondary_waiting
             while running and process.poll() is None:
                 config = load_config()
                 if secondary_process is not None and secondary_process.poll() is not None:
@@ -393,11 +430,29 @@ def supervise():
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
                     configure_audio(config)
+                    if len(config["pages"]) == 1 and not wait_for_page(config["pages"][0]["url"], process):
+                        break
                     tab_id = replace_tab(config["pages"][0]["url"], tab_id)
                     fingerprint = new_fingerprint
                     current = 0
                     next_rotation = float("inf") if len(config["pages"]) == 1 else time.monotonic() + config["rotation_seconds"]
                     print("Loaded kiosk playlist:", ", ".join(page["name"] for page in config["pages"]), flush=True)
+                now = time.monotonic()
+                if len(config["pages"]) == 1 and now >= next_page_health_check:
+                    reachable = page_reachable(config["pages"][0]["url"])
+                    if reachable and current_page_was_unreachable:
+                        tab_id = replace_tab(config["pages"][0]["url"], tab_id)
+                        print("Kiosk page connection restored; reloaded automatically", flush=True)
+                    current_page_was_unreachable = not reachable
+                    next_page_health_check = now + PAGE_HEALTH_SECONDS
+                if secondary_process is not None and now >= next_secondary_retry:
+                    reachable = page_reachable(secondary_url)
+                    if reachable and (secondary_waiting or secondary_was_unreachable):
+                        secondary_tab_id = replace_tab(secondary_url, secondary_tab_id, port=DEBUG_PORT + 1)
+                        secondary_waiting = False
+                        print("Baiamonte second display connection restored; reloaded automatically", flush=True)
+                    secondary_was_unreachable = not reachable
+                    next_secondary_retry = now + (PAGE_RETRY_SECONDS if secondary_was_unreachable else PAGE_HEALTH_SECONDS)
                 if requested_step and len(config["pages"]) > 1:
                     step = requested_step
                     requested_step = 0

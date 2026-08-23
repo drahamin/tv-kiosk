@@ -177,6 +177,22 @@ class BrowserControllerTests(unittest.TestCase):
         with patch.object(controller, "urlopen", return_value=response):
             self.assertEqual(controller.devtools("/json/activate/example"), "Target activated")
 
+    def test_page_reachability_retries_network_failures_but_accepts_http_responses(self):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        with patch.object(controller, "urlopen", return_value=response):
+            self.assertTrue(controller.page_reachable("http://example.test/tv"))
+        with patch.object(controller, "urlopen", side_effect=controller.HTTPError("http://example.test/tv", 401, "Unauthorized", {}, None)):
+            self.assertTrue(controller.page_reachable("http://example.test/tv"))
+        with patch.object(controller, "urlopen", side_effect=controller.URLError("offline")):
+            self.assertFalse(controller.page_reachable("http://example.test/tv"))
+
+    def test_controller_keeps_boot_screen_and_retries_single_page_sites(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("wait_for_page(config[\"pages\"][0][\"url\"], process)", source)
+        self.assertIn("Kiosk page connection restored; reloaded automatically", source)
+        self.assertIn("Baiamonte second display connection restored; reloaded automatically", source)
+
     def test_chromium_startup_allows_slow_dual_4k_profiles(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("range(240)", source)
@@ -197,9 +213,10 @@ class BrowserControllerTests(unittest.TestCase):
             result = controller.replace_tab("http://example.test/tv", "old")
 
         self.assertEqual(result, "new")
-        opened.assert_called_once_with("http://example.test/tv")
-        activated.assert_called_once_with("new")
+        opened.assert_called_once_with("http://example.test/tv", port=controller.DEBUG_PORT)
+        activated.assert_called_once_with("new", port=controller.DEBUG_PORT)
         self.assertEqual([call.args[0] for call in closed.call_args_list], ["old", "blank"])
+        self.assertTrue(all(call.kwargs == {"port": controller.DEBUG_PORT} for call in closed.call_args_list))
 
 
 if __name__ == "__main__":
