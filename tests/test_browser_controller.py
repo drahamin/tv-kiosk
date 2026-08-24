@@ -36,6 +36,7 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--disk-cache-size=268435456", command)
         self.assertIn("--renderer-process-limit=3", command)
         self.assertNotIn("--incognito", command)
+        self.assertIn("--app=file://", command[-1])
         self.assertTrue(command[-1].endswith("/session/boot.html?profile=multi&variant=auto"))
         self.assertNotIn("--mute-audio", command)
 
@@ -55,6 +56,7 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertIn("--enable-low-end-device-mode", command)
         self.assertIn("--process-per-site", command)
         self.assertIn("--js-flags=--max-old-space-size=192", command)
+        self.assertIn("--app=file://", command[-1])
         self.assertTrue(command[-1].endswith("/session/boot.html?profile=zero&variant=auto"))
 
     def test_baiamonte_pi_three_uses_constrained_chromium(self):

@@ -311,7 +311,10 @@ def launch_chromium(zoom_percent=100, audio_enabled=True, hardware_profile=None,
         command.append(f"--app={start_url}")
     else:
         command[1:1] = ["--kiosk", "--start-fullscreen", "--start-maximized"]
-        command.append(start_url)
+        # App mode removes Chromium's tab and address bars. Keep the kiosk and
+        # fullscreen flags as well so both X11 and Wayland releases cover the
+        # entire HDMI canvas without exposing browser navigation controls.
+        command.append(f"--app={start_url}")
     if constrained:
         heap_size = 192 if profile_name == "zero" else 256
         command[1:1] = ["--enable-low-end-device-mode", "--disable-smooth-scrolling", "--process-per-site", f"--js-flags=--max-old-space-size={heap_size}"]
