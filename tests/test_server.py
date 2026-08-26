@@ -118,6 +118,7 @@ class KioskServerTests(unittest.TestCase):
         self.assertIn("Change administrator login", body)
         self.assertIn("Baiamonte display on HDMI 2", body)
         self.assertIn("PI 4 / PI 5", body)
+        self.assertIn("CloudConnexa", body)
 
     def test_baiamonte_admin_documents_arrow_map_zoom(self):
         _token, csrf = self.module.new_session("admin")

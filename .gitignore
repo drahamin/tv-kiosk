@@ -2,6 +2,7 @@ dist/
 image/config.local.env
 image/kiosk_admin_ed25519
 image/kiosk_admin_ed25519.pub
+image/*.ovpn
 *.img
 *.img.xz
 *.zip

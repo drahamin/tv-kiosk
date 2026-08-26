@@ -149,6 +149,18 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("cog zram-tools", installer)
         self.assertIn("BROWSER_PACKAGE=cog", updater)
 
+    def test_cloudconnexa_profile_is_private_and_optional(self):
+        installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+        builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
+        setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
+        ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("CLOUDCONNEXA_PROFILE_FILE", installer)
+        self.assertIn("CLOUDCONNEXA_PROFILE_FILE", builder)
+        self.assertIn("cloudconnexa-baiamonte-dashboard.ovpn", builder)
+        self.assertIn("network-manager-openvpn", setup)
+        self.assertIn("tv-kiosk-cloudconnexa.service", setup)
+        self.assertIn("image/*.ovpn", ignore)
+
     def test_zero_swap_and_cloud_boot_are_idempotent(self):
         setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")
         zram = (ROOT / "scripts" / "rahamin-zramswap").read_text(encoding="utf-8")

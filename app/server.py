@@ -33,6 +33,7 @@ CREDENTIALS_PATH = Path(os.environ.get("KIOSK_CREDENTIALS", STATE_DIR / "admin.j
 NETWORK_REQUEST_PATH = STATE_DIR / "network-request.json"
 NETWORK_STATUS_PATH = STATE_DIR / "network-status.json"
 ACTION_REQUEST_PATH = STATE_DIR / "action-request"
+CLOUDCONNEXA_STATUS_PATH = Path(os.environ.get("KIOSK_CLOUDCONNEXA_STATUS", "/run/tv-kiosk/cloudconnexa-status.json"))
 SESSION_TTL = 8 * 60 * 60
 # The original ARMv6 Pi Zero takes well over 30 seconds at the multi-Pi value.
 # Keep the stronger value on Pi 3/4 and use a practical local-admin value on Zero.
@@ -310,6 +311,11 @@ def system_snapshot():
             hdmi_connectors.append(f"{status_path.parent.name.split('-', 1)[-1]}: {status_path.read_text().strip()}")
         except OSError:
             pass
+    try:
+        vpn_data = json.loads(CLOUDCONNEXA_STATUS_PATH.read_text(encoding="utf-8"))
+        vpn_status = f"{vpn_data.get('state', 'Unknown')} · {vpn_data.get('detail', '')}".strip(" ·")
+    except (OSError, ValueError, json.JSONDecodeError):
+        vpn_status = "Not configured"
     return {
         "hostname": socket.gethostname(),
         "model": model,
@@ -332,6 +338,7 @@ def system_snapshot():
         "current_page": current_browser_page(),
         "web_service": services["tv-kiosk-web.service"],
         "updater": services["tv-kiosk-update.timer"],
+        "cloudconnexa": vpn_status,
         "remote": remote,
         "audio": audio.replace("Volume: ", ""),
         "commit": commit or "Unavailable",
@@ -551,7 +558,7 @@ def admin_page(config, session, message="", error=False, snapshot=None):
 <h3>Wi-Fi IPv4</h3><div class="grid"><label>Mode<select name="wifi_ipv4_mode"><option value="auto"{selected(net['wifi_ipv4_mode'],'auto')}>Automatic (DHCP)</option><option value="manual"{selected(net['wifi_ipv4_mode'],'manual')}>Static</option></select></label><label>Address / prefix<input name="wifi_ipv4_address" value="{html.escape(net['wifi_ipv4_address'], quote=True)}" placeholder="192.168.86.118/24"></label><label>Gateway<input name="wifi_ipv4_gateway" value="{html.escape(net['wifi_ipv4_gateway'], quote=True)}"></label><label>DNS servers<input name="wifi_ipv4_dns" value="{html.escape(net['wifi_ipv4_dns'], quote=True)}" placeholder="1.1.1.1, 8.8.8.8"></label></div>
 <h3>Wi-Fi IPv6</h3><div class="grid"><label>Mode<select name="wifi_ipv6_mode"><option value="auto"{selected(net['wifi_ipv6_mode'],'auto')}>Automatic</option><option value="manual"{selected(net['wifi_ipv6_mode'],'manual')}>Static</option><option value="disabled"{selected(net['wifi_ipv6_mode'],'disabled')}>Disabled</option></select></label><label>Address / prefix<input name="wifi_ipv6_address" value="{html.escape(net['wifi_ipv6_address'], quote=True)}"></label><label>Gateway<input name="wifi_ipv6_gateway" value="{html.escape(net['wifi_ipv6_gateway'], quote=True)}"></label><label>DNS servers<input name="wifi_ipv6_dns" value="{html.escape(net['wifi_ipv6_dns'], quote=True)}"></label></div>
 <h3>Ethernet</h3><div class="grid"><label class="check"><input type="checkbox" name="ethernet_enabled"{checked(net['ethernet_enabled'])}>Ethernet connection enabled</label><label>IPv4 mode<select name="ethernet_ipv4_mode"><option value="auto"{selected(net['ethernet_ipv4_mode'],'auto')}>Automatic (DHCP)</option><option value="manual"{selected(net['ethernet_ipv4_mode'],'manual')}>Static</option></select></label><label>IPv4 address / prefix<input name="ethernet_ipv4_address" value="{html.escape(net['ethernet_ipv4_address'], quote=True)}"></label><label>IPv4 gateway<input name="ethernet_ipv4_gateway" value="{html.escape(net['ethernet_ipv4_gateway'], quote=True)}"></label><label>IPv4 DNS<input name="ethernet_ipv4_dns" value="{html.escape(net['ethernet_ipv4_dns'], quote=True)}"></label><label>IPv6 mode<select name="ethernet_ipv6_mode"><option value="auto"{selected(net['ethernet_ipv6_mode'],'auto')}>Automatic</option><option value="manual"{selected(net['ethernet_ipv6_mode'],'manual')}>Static</option><option value="disabled"{selected(net['ethernet_ipv6_mode'],'disabled')}>Disabled</option></select></label><label>IPv6 address / prefix<input name="ethernet_ipv6_address" value="{html.escape(net['ethernet_ipv6_address'], quote=True)}"></label><label>IPv6 gateway<input name="ethernet_ipv6_gateway" value="{html.escape(net['ethernet_ipv6_gateway'], quote=True)}"></label><label>IPv6 DNS<input name="ethernet_ipv6_dns" value="{html.escape(net['ethernet_ipv6_dns'], quote=True)}"></label></div><p class="flash error"><strong>Network changes can disconnect this browser.</strong> Verify the SSID, password, static address, gateway, and DNS before applying. The saved Wi-Fi password is never displayed.</p><div class="actions"><button class="danger" type="submit">Apply network configuration</button></div></form>'''
-    operations = "".join((stat_card("Display profile", snapshot["profile"], "profile"), stat_card("HDMI outputs", snapshot["hdmi_outputs"], "hdmi_outputs"), stat_card("Current page", snapshot["current_page"], "current_page"), stat_card("HDMI audio", snapshot["audio"], "audio"), stat_card("Samsung remote", snapshot["remote"], "remote"), stat_card("Web service", snapshot["web_service"], "web_service"), stat_card("Auto-updater", snapshot["updater"], "updater"), stat_card("Installed version", snapshot["commit"], "commit")))
+    operations = "".join((stat_card("Display profile", snapshot["profile"], "profile"), stat_card("HDMI outputs", snapshot["hdmi_outputs"], "hdmi_outputs"), stat_card("Current page", snapshot["current_page"], "current_page"), stat_card("HDMI audio", snapshot["audio"], "audio"), stat_card("Samsung remote", snapshot["remote"], "remote"), stat_card("CloudConnexa", snapshot["cloudconnexa"], "cloudconnexa"), stat_card("Web service", snapshot["web_service"], "web_service"), stat_card("Auto-updater", snapshot["updater"], "updater"), stat_card("Installed version", snapshot["commit"], "commit")))
     playlist_title = "Baiamonte single-page dashboard" if HARDWARE_PROFILE == "zero" else "Up to five full-screen pages"
     playlist_note = "The Pi Zero profile keeps only this page loaded to protect its 512 MB memory." if HARDWARE_PROFILE == "zero" else "Disabled pages stay saved but are skipped by the TV. At least one page must remain enabled."
     tv_keyboard = f'''<section class="card"><div class="card-head"><span class="eyebrow">NO PHYSICAL KEYBOARD NEEDED</span><h2>TV keyboard</h2></div><div class="body"><p class="note">Use this when a displayed page asks you to sign in. Press Tab to move between fields, type below, then send it to the active TV window. Rahamin Kiosk does not save this text.</p><div class="grid"><label class="wide">Text to type on TV<input id="tv-keyboard-text" type="password" autocomplete="off" placeholder="email, username, or password"></label></div><div class="actions"><button type="button" class="secondary tv-key" data-key="tab">Tab</button><button type="button" class="secondary tv-key" data-key="backspace">Backspace</button><button type="button" class="secondary tv-key" data-key="escape">Escape</button><button type="button" class="gold" id="tv-send-text">Send text</button><button type="button" id="tv-enter">Enter</button><span class="note" id="tv-keyboard-result"></span></div></div></section>'''

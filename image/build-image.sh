@@ -30,11 +30,16 @@ fi
 : "${KIOSK_REPO_URL:=}"
 : "${RPI_OS_IMAGE_URL:=}"
 : "${SSH_PUBLIC_KEY_FILE:=$ROOT_DIR/image/kiosk_admin_ed25519.pub}"
+: "${CLOUDCONNEXA_PROFILE_FILE:=}"
 
 if [[ "$SSH_PUBLIC_KEY_FILE" != /* ]]; then
   SSH_PUBLIC_KEY_FILE="$ROOT_DIR/$SSH_PUBLIC_KEY_FILE"
 fi
 [[ -s "$SSH_PUBLIC_KEY_FILE" ]] || { echo "Missing SSH public key: $SSH_PUBLIC_KEY_FILE" >&2; exit 1; }
+if [[ -n "$CLOUDCONNEXA_PROFILE_FILE" ]]; then
+  [[ "$CLOUDCONNEXA_PROFILE_FILE" == /* ]] || CLOUDCONNEXA_PROFILE_FILE="$ROOT_DIR/$CLOUDCONNEXA_PROFILE_FILE"
+  [[ -s "$CLOUDCONNEXA_PROFILE_FILE" ]] || { echo "Missing CloudConnexa profile: $CLOUDCONNEXA_PROFILE_FILE" >&2; exit 1; }
+fi
 [[ "$WIFI_COUNTRY" =~ ^[A-Z]{2}$ ]] || { echo "WIFI_COUNTRY must be a two-letter uppercase country code" >&2; exit 1; }
 [[ "$KIOSK_PROFILE" =~ ^(auto|zero|multi)$ ]] || { echo "KIOSK_PROFILE must be auto, zero, or multi" >&2; exit 1; }
 [[ "$KIOSK_VARIANT" =~ ^(auto|baiamonte|rahamin)$ ]] || { echo "KIOSK_VARIANT must be auto, baiamonte, or rahamin" >&2; exit 1; }
@@ -111,6 +116,9 @@ ROOT_LOOP=$(losetup --find --show --offset "$((ROOT_START * 512))" --sizelimit "
 mount "$ROOT_LOOP" "$WORK_DIR/root"
 
 mkdir -p "$WORK_DIR/root/opt/tv-kiosk-bootstrap" "$WORK_DIR/root/etc/NetworkManager/system-connections" "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants" "$WORK_DIR/root/etc/tv-kiosk"
+if [[ -n "$CLOUDCONNEXA_PROFILE_FILE" ]]; then
+  install -m 0600 "$CLOUDCONNEXA_PROFILE_FILE" "$WORK_DIR/root/etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn"
+fi
 for item in app config scripts session systemd install.sh README.md; do
   cp -a "$ROOT_DIR/$item" "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
 done

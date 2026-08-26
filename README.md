@@ -26,6 +26,13 @@ SSH maintenance, HDMI/CEC handling, recovery supervision, and GitHub updater.
 Set `BAIAMONTE_TV_URL` during image creation or edit Page 1 in Admin to change
 the Baiamonte dashboard address.
 
+An optional CloudConnexa fallback keeps the local dashboard address unchanged.
+The kiosk first tries `192.168.0.10:8101` directly. After three consecutive
+failures it starts the private `baiamonte-dashboard` OpenVPN profile, while
+leaving the tunnel off whenever the dashboard is reachable on the local LAN.
+The Admin status page reports **Local LAN**, **VPN connected**, or the current
+retry state.
+
 The local service listens on port `8999` by default and provides:
 
 - `/` and `/tv` — rotating full-screen playlist
@@ -204,6 +211,7 @@ KIOSK_PROFILE=auto
 KIOSK_VARIANT=baiamonte
 BAIAMONTE_TV_URL=http://192.168.0.10:8101
 KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
+CLOUDCONNEXA_PROFILE_FILE=image/cloudconnexa-baiamonte-dashboard.ovpn
 ```
 
 Set `BAIAMONTE_TV_URL` to an alternate local or external display URL without
@@ -212,3 +220,10 @@ changing the image software.
 Wi-Fi credentials are read from the ignored `image/config.local.env`; see
 `image/config.example.env`. The generated image contains the Wi-Fi password, so
 keep it private and never commit the local environment file or generated image.
+The CloudConnexa profile is also private and is ignored by Git. Download the
+unattended `.ovpn` profile for the kiosk from the CloudConnexa portal, place it
+at `image/cloudconnexa-baiamonte-dashboard.ovpn`, and set the path above before
+building. A Cloud ID by itself normally requires an interactive sign-in and is
+not sufficient for a keyboard-free kiosk. The fallback uses split routing, so
+GitHub updates and unrelated web traffic continue through the deployment's
+ordinary Ethernet or Wi-Fi connection.

@@ -181,9 +181,9 @@ if [ "$KIOSK_HARDWARE_PROFILE" = zero ] && ! command -v cog >/dev/null 2>&1; the
 elif [ "$KIOSK_HARDWARE_PROFILE" != zero ] && ! command -v chromium >/dev/null 2>&1; then
   BROWSER_PACKAGE=chromium
 fi
-if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || ! command -v wlr-randr >/dev/null 2>&1 || ! command -v xdotool >/dev/null 2>&1 || [ -n "$BROWSER_PACKAGE" ]; then
+if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || ! command -v wlr-randr >/dev/null 2>&1 || ! command -v xdotool >/dev/null 2>&1 || ! command -v openvpn >/dev/null 2>&1 || ! dpkg-query -W -f='${Status}' network-manager-openvpn 2>/dev/null | grep -q 'install ok installed' || [ -n "$BROWSER_PACKAGE" ]; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc wlr-randr wtype xdotool $BROWSER_PACKAGE
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc network-manager-openvpn openvpn wlr-randr wtype xdotool $BROWSER_PACKAGE
 fi
 
 # Older builds selected Openbox even though the optimized Chromium and CEC
@@ -216,13 +216,19 @@ install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-network" /usr/local/sbin/rahamin
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cleanup" /usr/local/sbin/rahamin-kiosk-cleanup
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action" /usr/local/sbin/rahamin-kiosk-action
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action-request" /usr/local/sbin/rahamin-kiosk-action-request
+install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cloudconnexa" /usr/local/sbin/rahamin-kiosk-cloudconnexa
 rm -f /etc/sudoers.d/90-rahamin-kiosk-network /etc/sudoers.d/91-rahamin-kiosk-action
 
-for unit in tv-kiosk-web.service tv-kiosk-update.service tv-kiosk-update.timer tv-kiosk-action.service tv-kiosk-action.path tv-kiosk-network.service tv-kiosk-network.path; do
+for unit in tv-kiosk-web.service tv-kiosk-update.service tv-kiosk-update.timer tv-kiosk-action.service tv-kiosk-action.path tv-kiosk-network.service tv-kiosk-network.path tv-kiosk-cloudconnexa.service; do
   install -m 0644 "$APP_DIR/systemd/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
 systemctl enable --now tv-kiosk-update.timer tv-kiosk-action.path tv-kiosk-network.path >/dev/null
+if [ -s /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn ]; then
+  systemctl enable --now tv-kiosk-cloudconnexa.service >/dev/null
+else
+  systemctl disable --now tv-kiosk-cloudconnexa.service >/dev/null 2>&1 || true
+fi
 
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/systemd/user"
 BROWSER_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-browser.service"

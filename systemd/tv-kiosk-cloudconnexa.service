@@ -1,0 +1,15 @@
+[Unit]
+Description=Rahamin Kiosk Baiamonte CloudConnexa fallback
+After=NetworkManager.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/tv-kiosk/kiosk.env
+ExecStart=/usr/local/sbin/rahamin-kiosk-cloudconnexa
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

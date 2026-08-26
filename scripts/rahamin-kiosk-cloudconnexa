@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Bring up the Baiamonte CloudConnexa tunnel only when direct access fails."""
+
+import hashlib
+import json
+import os
+import re
+import socket
+import subprocess
+import time
+from pathlib import Path
+
+
+PROFILE = Path(os.environ.get("KIOSK_CLOUDCONNEXA_PROFILE", "/etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn"))
+CONNECTION = os.environ.get("KIOSK_CLOUDCONNEXA_CONNECTION", "baiamonte-dashboard")
+TARGET_HOST = os.environ.get("KIOSK_BAIAMONTE_HOST", "192.168.0.10")
+TARGET_PORT = int(os.environ.get("KIOSK_BAIAMONTE_PORT", "8101"))
+STATUS = Path(os.environ.get("KIOSK_CLOUDCONNEXA_STATUS", "/run/tv-kiosk/cloudconnexa-status.json"))
+FINGERPRINT = Path(os.environ.get("KIOSK_CLOUDCONNEXA_FINGERPRINT", "/var/lib/rahamin-kiosk/cloudconnexa-profile.sha256"))
+CHECK_SECONDS = int(os.environ.get("KIOSK_CLOUDCONNEXA_CHECK_SECONDS", "15"))
+FAILURES_BEFORE_CONNECT = int(os.environ.get("KIOSK_CLOUDCONNEXA_FAILURES", "3"))
+
+
+def run(*command, check=False):
+    return subprocess.run(command, capture_output=True, text=True, timeout=60, check=check)
+
+
+def write_status(state, detail):
+    STATUS.parent.mkdir(parents=True, exist_ok=True)
+    temporary = STATUS.with_suffix(".tmp")
+    temporary.write_text(json.dumps({"state": state, "detail": detail, "updated": int(time.time())}) + "\n", encoding="utf-8")
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, STATUS)
+
+
+def direct_dashboard_reachable():
+    try:
+        with socket.create_connection((TARGET_HOST, TARGET_PORT), timeout=4):
+            return True
+    except OSError:
+        return False
+
+
+def connection_exists():
+    return run("nmcli", "-g", "connection.id", "connection", "show", CONNECTION).returncode == 0
+
+
+def connection_active():
+    result = run("nmcli", "-g", "GENERAL.STATE", "connection", "show", CONNECTION)
+    return result.returncode == 0 and result.stdout.strip().lower().startswith("activated")
+
+
+def profile_fingerprint():
+    return hashlib.sha256(PROFILE.read_bytes()).hexdigest()
+
+
+def imported_fingerprint():
+    try:
+        return FINGERPRINT.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def import_profile():
+    digest = profile_fingerprint()
+    if connection_exists() and imported_fingerprint() == digest:
+        return
+
+    if connection_exists():
+        run("nmcli", "connection", "down", CONNECTION)
+        run("nmcli", "connection", "delete", CONNECTION, check=True)
+
+    result = run("nmcli", "connection", "import", "type", "openvpn", "file", str(PROFILE), check=True)
+    match = re.search(r"\(([0-9a-fA-F-]{36})\)", result.stdout)
+    if not match:
+        raise RuntimeError("NetworkManager imported the profile but did not return its UUID")
+    uuid = match.group(1)
+    run("nmcli", "connection", "modify", "uuid", uuid,
+        "connection.id", CONNECTION,
+        "connection.autoconnect", "no",
+        "ipv4.never-default", "yes",
+        "ipv6.never-default", "yes", check=True)
+    FINGERPRINT.parent.mkdir(parents=True, exist_ok=True)
+    FINGERPRINT.write_text(digest + "\n", encoding="utf-8")
+    os.chmod(FINGERPRINT, 0o600)
+
+
+def desired_action(profile_exists, vpn_active, direct_reachable, failures):
+    if not profile_exists:
+        return "unconfigured", 0
+    if vpn_active:
+        return "connected", 0
+    if direct_reachable:
+        return "local", 0
+    failures += 1
+    return ("connect" if failures >= FAILURES_BEFORE_CONNECT else "waiting"), failures
+
+
+def main():
+    failures = 0
+    while True:
+        try:
+            if not PROFILE.is_file():
+                write_status("Not configured", "Add the private baiamonte-dashboard CloudConnexa .ovpn profile")
+                time.sleep(60)
+                continue
+
+            import_profile()
+            action, failures = desired_action(True, connection_active(), direct_dashboard_reachable(), failures)
+            if action == "connected":
+                write_status("VPN connected", f"CloudConnexa {CONNECTION} is active")
+            elif action == "local":
+                write_status("Local LAN", f"Dashboard is reachable directly at {TARGET_HOST}:{TARGET_PORT}")
+            elif action == "waiting":
+                write_status("Checking fallback", f"Direct dashboard check failed {failures}/{FAILURES_BEFORE_CONNECT}")
+            elif action == "connect":
+                write_status("Connecting", f"Starting CloudConnexa {CONNECTION}")
+                result = run("nmcli", "--wait", "45", "connection", "up", CONNECTION)
+                if result.returncode == 0:
+                    failures = 0
+                    write_status("VPN connected", f"CloudConnexa {CONNECTION} is active")
+                else:
+                    write_status("VPN retrying", (result.stderr or result.stdout).strip()[-300:])
+            time.sleep(CHECK_SECONDS)
+        except Exception as exc:  # Keep the watchdog alive through transient NM/profile errors.
+            write_status("VPN retrying", str(exc)[:300])
+            time.sleep(30)
+
+
+if __name__ == "__main__":
+    main()

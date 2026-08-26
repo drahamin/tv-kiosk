@@ -17,6 +17,7 @@ BAIAMONTE_TV_URL=${BAIAMONTE_TV_URL:-http://192.168.0.10:8101}
 WIFI_PRIMARY_SSID=${WIFI_PRIMARY_SSID:-Home}
 WIFI_SECONDARY_SSID=${WIFI_SECONDARY_SSID:-Baiamonte}
 WIFI_PSK=${WIFI_PSK:-}
+CLOUDCONNEXA_PROFILE_FILE=${CLOUDCONNEXA_PROFILE_FILE:-}
 
 HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
 HARDWARE_PROFILE=$(KIOSK_PROFILE="$KIOSK_PROFILE" KIOSK_HARDWARE_MODEL="$HARDWARE_MODEL" sh "$SOURCE_DIR/scripts/detect-hardware-profile")
@@ -44,7 +45,7 @@ if [ "${KIOSK_APT_UPDATED:-0}" != 1 ]; then
   apt-get update
 fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  avahi-daemon cec-utils git labwc lightdm network-manager openssh-server pipewire pipewire-pulse python3 wireplumber wtype
+  avahi-daemon cec-utils git labwc lightdm network-manager network-manager-openvpn openvpn openssh-server pipewire pipewire-pulse python3 wireplumber wtype
 if [ "$HARDWARE_PROFILE" = zero ]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cog zram-tools
 else
@@ -71,9 +72,12 @@ if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
 fi
 
 chown -R root:root "$APP_DIR"
-chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/detect-hardware-profile" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio" "$APP_DIR/scripts/rahamin-kiosk-chime"
+chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/detect-hardware-profile" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio" "$APP_DIR/scripts/rahamin-kiosk-chime" "$APP_DIR/scripts/rahamin-kiosk-cloudconnexa"
 
 mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/tv-kiosk"
+if [ -n "$CLOUDCONNEXA_PROFILE_FILE" ]; then
+  install -m 0600 "$CLOUDCONNEXA_PROFILE_FILE" /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn
+fi
 cat > /etc/tv-kiosk/kiosk.env <<EOF
 KIOSK_PORT=$KIOSK_PORT
 KIOSK_UPDATE_BRANCH=$KIOSK_UPDATE_BRANCH
