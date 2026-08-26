@@ -37,7 +37,7 @@ path = sys.argv[1]
 with open(path, encoding="utf-8") as handle:
     config = json.load(handle)
 config["secondary_display_enabled"] = True
-config.setdefault("secondary_display_url", "http://192.168.0.10:8101")
+config.setdefault("secondary_display_url", "http://192.168.0.10:8123")
 config.setdefault("secondary_zoom_percent", 100)
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(config, handle, indent=2)

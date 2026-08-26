@@ -7,7 +7,7 @@
   "audio_enabled": true,
   "audio_volume": 60,
   "secondary_display_enabled": false,
-  "secondary_display_url": "http://192.168.0.10:8101",
+  "secondary_display_url": "http://192.168.0.10:8123",
   "secondary_zoom_percent": 100,
   "show_status": false,
   "background": "#050706",
@@ -16,7 +16,7 @@
   "pages": [
     {
       "name": "Baiamonte TV Dashboard",
-      "url": "http://192.168.0.10:8101",
+      "url": "http://192.168.0.10:8123",
       "enabled": true
     }
   ]

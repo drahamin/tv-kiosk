@@ -16,7 +16,7 @@ The project produces two flashable image products:
    board at first boot. Pi Zero uses the lightweight dashboard mode and omits
    camera-heavy dashboard sections; Pi 3+ uses Chromium and displays every
    Baiamonte dashboard section. Both open the VPN-local TV display at
-   `http://192.168.0.10:8101` by default.
+   `http://192.168.0.10:8123` by default.
 2. **Rahamin Kiosk — Five Page** — a Pi 3+ image with the five enabled ADS-B,
    AIS, airport, Miami weather, and Sicily weather pages listed above. It begins
    rotating immediately at 45-second intervals.
@@ -27,9 +27,12 @@ Set `BAIAMONTE_TV_URL` during image creation or edit Page 1 in Admin to change
 the Baiamonte dashboard address.
 
 An optional CloudConnexa fallback keeps the local dashboard address unchanged.
-The kiosk first tries `192.168.0.10:8101` directly. After three consecutive
+The kiosk first tries `192.168.0.10:8123` directly. After three consecutive
 failures it starts the private `baiamonte-dashboard` OpenVPN profile, while
 leaving the tunnel off whenever the dashboard is reachable on the local LAN.
+While connected, the display switches to
+`http://ha.dashboard.baiamonte:8123`; when local access returns, it disconnects
+the tunnel and switches back to `http://192.168.0.10:8123` automatically.
 The Admin status page reports **Local LAN**, **VPN connected**, or the current
 retry state.
 
@@ -153,7 +156,7 @@ all five heavy map pages in memory.
 The Rahamin Admin page can enable an independent Baiamonte dashboard on the
 second HDMI connector of a Raspberry Pi 4 or Pi 5. Connect both TVs before
 enabling it, then open Admin, enable **Baiamonte display on HDMI 2**, confirm the
-dashboard URL (default `http://192.168.0.10:8101`), and save. HDMI 1 retains the
+dashboard URL (default `http://192.168.0.10:8123`), and save. HDMI 1 retains the
 five-page Rahamin rotation while HDMI 2 keeps Baiamonte loaded continuously.
 
 Each display uses a separate Chromium profile, cache, and supervised process.
@@ -209,7 +212,7 @@ WIFI_SECONDARY_SSID=Baiamonte
 WIFI_PSK=your-shared-password
 KIOSK_PROFILE=auto
 KIOSK_VARIANT=baiamonte
-BAIAMONTE_TV_URL=http://192.168.0.10:8101
+BAIAMONTE_TV_URL=http://192.168.0.10:8123
 KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
 CLOUDCONNEXA_PROFILE_FILE=image/cloudconnexa-baiamonte-dashboard.ovpn
 ```
