@@ -9,7 +9,7 @@ import time
 import re
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +21,10 @@ CHROMIUM = os.environ.get("KIOSK_CHROMIUM", "chromium")
 COG = os.environ.get("KIOSK_COG", "cog")
 HARDWARE_PROFILE = os.environ.get("KIOSK_HARDWARE_PROFILE", "multi").strip().lower()
 KIOSK_VARIANT = os.environ.get("KIOSK_VARIANT", "auto").strip().lower()
+CLOUDCONNEXA_STATUS = Path(os.environ.get("KIOSK_CLOUDCONNEXA_STATUS", "/run/tv-kiosk/cloudconnexa-status.json"))
+BAIAMONTE_LOCAL_HOST = os.environ.get("KIOSK_BAIAMONTE_HOST", "192.168.0.10")
+BAIAMONTE_LOCAL_PORT = int(os.environ.get("KIOSK_BAIAMONTE_PORT", "8123"))
+BAIAMONTE_VPN_URL = os.environ.get("KIOSK_BAIAMONTE_VPN_URL", "http://ha.dashboard.baiamonte:8123")
 running = True
 requested_step = 0
 BOOT_MIN_SECONDS = 4
@@ -58,10 +62,39 @@ def load_config():
         "audio_enabled": bool(config.get("audio_enabled", True)),
         "audio_volume": int(config.get("audio_volume", 60)),
         "secondary_display_enabled": bool(config.get("secondary_display_enabled", False)),
-        "secondary_display_url": str(config.get("secondary_display_url", "http://192.168.0.10:8101")),
+        "secondary_display_url": str(config.get("secondary_display_url", "http://192.168.0.10:8123")),
         "secondary_zoom_percent": int(config.get("secondary_zoom_percent", 100)),
         "pages": [{"name": str(page["name"]), "url": str(page["url"])} for page in pages],
     }
+
+
+def cloudconnexa_connected():
+    try:
+        status = json.loads(CLOUDCONNEXA_STATUS.read_text(encoding="utf-8"))
+        return status.get("state") == "VPN connected"
+    except (OSError, ValueError):
+        return False
+
+
+def resolved_dashboard_url(url):
+    """Swap only the Baiamonte local HA origin for its private VPN origin."""
+    if KIOSK_VARIANT != "baiamonte":
+        return url
+    try:
+        parsed = urlparse(str(url))
+    except ValueError:
+        return url
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    if parsed.hostname == BAIAMONTE_LOCAL_HOST and port == BAIAMONTE_LOCAL_PORT and cloudconnexa_connected():
+        return BAIAMONTE_VPN_URL
+    return url
+
+
+def resolved_config(config):
+    result = {**config}
+    result["pages"] = [{**page, "url": resolved_dashboard_url(page["url"])} for page in config["pages"]]
+    result["secondary_display_url"] = resolved_dashboard_url(config.get("secondary_display_url", ""))
+    return result
 
 
 def devtools(path, method="GET", timeout=3, port=DEBUG_PORT):
@@ -136,11 +169,12 @@ def page_reachable(url, timeout=6):
 def wait_for_page(url, process):
     """Keep the branded boot view up until a single-page kiosk is reachable."""
     while running and process.poll() is None:
-        if page_reachable(url):
-            return True
-        print(f"Page unavailable; retrying in {PAGE_RETRY_SECONDS} seconds: {url}", flush=True)
+        candidate = resolved_dashboard_url(url)
+        if page_reachable(candidate):
+            return candidate
+        print(f"Page unavailable; retrying in {PAGE_RETRY_SECONDS} seconds: {candidate}", flush=True)
         time.sleep(PAGE_RETRY_SECONDS)
-    return False
+    return None
 
 
 def configure_audio(config):
@@ -340,14 +374,14 @@ def launch_cog(url):
 def supervise_cog():
     """Keep one low-memory WebKit view alive on original ARMv6 Pi Zero boards."""
     while running:
-        config = load_config()
+        config = resolved_config(load_config())
         configure_audio(config)
         fingerprint = json.dumps(config, sort_keys=True)
         process = launch_cog(config["pages"][0]["url"])
         print(f"Loaded Pi Zero kiosk page: {config['pages'][0]['name']}", flush=True)
         try:
             while running and process.poll() is None:
-                updated = load_config()
+                updated = resolved_config(load_config())
                 if json.dumps(updated, sort_keys=True) != fingerprint:
                     print("Pi Zero page, zoom, or audio settings changed; restarting Cog", flush=True)
                     break
@@ -377,7 +411,7 @@ def supervise():
         dual = len(outputs) == 2
         secondary_process = None
         secondary_tab_id = None
-        secondary_url = launch_config.get("secondary_display_url", "http://192.168.0.10:8101")
+        secondary_url = resolved_dashboard_url(launch_config.get("secondary_display_url", "http://192.168.0.10:8123"))
         secondary_waiting = False
         if dual:
             secondary_ready = page_reachable(secondary_url)
@@ -419,22 +453,26 @@ def supervise():
             current_page_was_unreachable = False
             secondary_was_unreachable = secondary_waiting
             while running and process.poll() is None:
-                config = load_config()
+                raw_config = load_config()
+                config = resolved_config(raw_config)
                 if secondary_process is not None and secondary_process.poll() is not None:
                     print("Baiamonte second display exited; restarting both displays", flush=True)
                     break
-                if config["zoom_percent"] != launch_config["zoom_percent"] or config["audio_enabled"] != launch_config["audio_enabled"]:
+                if raw_config["zoom_percent"] != launch_config["zoom_percent"] or raw_config["audio_enabled"] != launch_config["audio_enabled"]:
                     print("Display scale or audio mode changed; restarting Chromium", flush=True)
                     break
                 secondary_settings = ("secondary_display_enabled", "secondary_display_url", "secondary_zoom_percent")
-                if any(config.get(key) != launch_config.get(key) for key in secondary_settings):
+                if any(raw_config.get(key) != launch_config.get(key) for key in secondary_settings):
                     print("Second HDMI settings changed; rebuilding the display layout", flush=True)
                     break
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
                     configure_audio(config)
-                    if len(config["pages"]) == 1 and not wait_for_page(config["pages"][0]["url"], process):
-                        break
+                    if len(config["pages"]) == 1:
+                        reachable_url = wait_for_page(raw_config["pages"][0]["url"], process)
+                        if not reachable_url:
+                            break
+                        config["pages"][0]["url"] = reachable_url
                     tab_id = replace_tab(config["pages"][0]["url"], tab_id)
                     fingerprint = new_fingerprint
                     current = 0

@@ -115,7 +115,7 @@ def validate_config(config):
     audio_volume = int(config.get("audio_volume", 60))
     if not 0 <= audio_volume <= 100:
         raise ValueError("HDMI audio volume must be between 0 and 100")
-    secondary_display_url = str(config.get("secondary_display_url", "http://192.168.0.10:8101")).strip()
+    secondary_display_url = str(config.get("secondary_display_url", "http://192.168.0.10:8123")).strip()
     parsed_secondary = urlparse(secondary_display_url)
     if parsed_secondary.scheme not in ("http", "https") or not parsed_secondary.netloc:
         raise ValueError("The Baiamonte second-display URL must be a valid HTTP or HTTPS address")
@@ -725,7 +725,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(403, "text/plain; charset=utf-8", "Invalid security token\n")
                 return
             if path == "/admin/settings":
-                config = save_config({"title": form.get("title", ""), "listen_port": form.get("listen_port", "8999"), "rotation_seconds": form.get("rotation_seconds", "45"), "transition_seconds": form.get("transition_seconds", "0.7"), "zoom_percent": form.get("zoom_percent", "100"), "audio_enabled": form.get("audio_enabled") == "on", "audio_volume": form.get("audio_volume", "60"), "secondary_display_enabled": form.get("secondary_display_enabled") == "on", "secondary_display_url": form.get("secondary_display_url", "http://192.168.0.10:8101"), "secondary_zoom_percent": form.get("secondary_zoom_percent", "100"), "show_status": form.get("show_status") == "on", "setup_complete": form.get("setup_complete") == "on", "background": form.get("background", "#080706"), "theme": form.get("theme", "rahamin"), "pages": [{"name": form.get(f"page_{i}_name", ""), "url": form.get(f"page_{i}_url", ""), "enabled": form.get(f"page_{i}_enabled") == "on"} for i in range(1, MAX_PAGES + 1)]})
+                config = save_config({"title": form.get("title", ""), "listen_port": form.get("listen_port", "8999"), "rotation_seconds": form.get("rotation_seconds", "45"), "transition_seconds": form.get("transition_seconds", "0.7"), "zoom_percent": form.get("zoom_percent", "100"), "audio_enabled": form.get("audio_enabled") == "on", "audio_volume": form.get("audio_volume", "60"), "secondary_display_enabled": form.get("secondary_display_enabled") == "on", "secondary_display_url": form.get("secondary_display_url", "http://192.168.0.10:8123"), "secondary_zoom_percent": form.get("secondary_zoom_percent", "100"), "show_status": form.get("show_status") == "on", "setup_complete": form.get("setup_complete") == "on", "background": form.get("background", "#080706"), "theme": form.get("theme", "rahamin"), "pages": [{"name": form.get(f"page_{i}_name", ""), "url": form.get(f"page_{i}_url", ""), "enabled": form.get(f"page_{i}_enabled") == "on"} for i in range(1, MAX_PAGES + 1)]})
                 self.reply(200, "text/html; charset=utf-8", admin_page(config, session, "Settings saved. The live playlist will reload automatically."))
             elif path == "/admin/network":
                 if not Path("/etc/systemd/system/tv-kiosk-network.path").exists():

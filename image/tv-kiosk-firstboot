@@ -17,7 +17,7 @@ fi
 : "${WIFI_SECONDARY_SSID:=Baiamonte}"
 : "${KIOSK_PROFILE:=auto}"
 : "${KIOSK_VARIANT:=auto}"
-: "${BAIAMONTE_TV_URL:=http://192.168.0.10:8101}"
+: "${BAIAMONTE_TV_URL:=http://192.168.0.10:8123}"
 
 # Establish recovery access before networking, apt, or GitHub can fail. Recent
 # Raspberry Pi OS images do not consistently consume userconf.txt before this

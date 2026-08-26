@@ -14,7 +14,7 @@ from pathlib import Path
 PROFILE = Path(os.environ.get("KIOSK_CLOUDCONNEXA_PROFILE", "/etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn"))
 CONNECTION = os.environ.get("KIOSK_CLOUDCONNEXA_CONNECTION", "baiamonte-dashboard")
 TARGET_HOST = os.environ.get("KIOSK_BAIAMONTE_HOST", "192.168.0.10")
-TARGET_PORT = int(os.environ.get("KIOSK_BAIAMONTE_PORT", "8101"))
+TARGET_PORT = int(os.environ.get("KIOSK_BAIAMONTE_PORT", "8123"))
 STATUS = Path(os.environ.get("KIOSK_CLOUDCONNEXA_STATUS", "/run/tv-kiosk/cloudconnexa-status.json"))
 FINGERPRINT = Path(os.environ.get("KIOSK_CLOUDCONNEXA_FINGERPRINT", "/var/lib/rahamin-kiosk/cloudconnexa-profile.sha256"))
 CHECK_SECONDS = int(os.environ.get("KIOSK_CLOUDCONNEXA_CHECK_SECONDS", "15"))
@@ -88,10 +88,10 @@ def import_profile():
 def desired_action(profile_exists, vpn_active, direct_reachable, failures):
     if not profile_exists:
         return "unconfigured", 0
+    if direct_reachable:
+        return ("disconnect" if vpn_active else "local"), 0
     if vpn_active:
         return "connected", 0
-    if direct_reachable:
-        return "local", 0
     failures += 1
     return ("connect" if failures >= FAILURES_BEFORE_CONNECT else "waiting"), failures
 
@@ -107,10 +107,17 @@ def main():
 
             import_profile()
             action, failures = desired_action(True, connection_active(), direct_dashboard_reachable(), failures)
-            if action == "connected":
+            if action == "disconnect":
+                write_status("Disconnecting VPN", "Local Baiamonte dashboard is reachable again")
+                result = run("nmcli", "--wait", "30", "connection", "down", CONNECTION)
+                if result.returncode == 0:
+                    write_status("Local LAN", f"VPN off; dashboard is direct at {TARGET_HOST}:{TARGET_PORT}")
+                else:
+                    write_status("VPN retrying", (result.stderr or result.stdout).strip()[-300:])
+            elif action == "connected":
                 write_status("VPN connected", f"CloudConnexa {CONNECTION} is active")
             elif action == "local":
-                write_status("Local LAN", f"Dashboard is reachable directly at {TARGET_HOST}:{TARGET_PORT}")
+                write_status("Local LAN", f"VPN off; dashboard is direct at {TARGET_HOST}:{TARGET_PORT}")
             elif action == "waiting":
                 write_status("Checking fallback", f"Direct dashboard check failed {failures}/{FAILURES_BEFORE_CONNECT}")
             elif action == "connect":

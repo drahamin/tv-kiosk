@@ -170,7 +170,7 @@ class KioskServerTests(unittest.TestCase):
         configured = self.module.validate_config({
             **self.config,
             "secondary_display_enabled": True,
-            "secondary_display_url": "http://192.168.0.10:8101",
+            "secondary_display_url": "http://192.168.0.10:8123",
             "secondary_zoom_percent": 110,
         })
         self.assertTrue(configured["secondary_display_enabled"])

@@ -113,6 +113,27 @@ class BrowserControllerTests(unittest.TestCase):
                 config = controller.load_config()
         self.assertEqual(config["pages"], [{"name": "Baiamonte", "url": "https://cloud.example/tv"}])
 
+    def test_baiamonte_uses_private_hostname_only_while_vpn_is_connected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            status = Path(directory) / "cloudconnexa.json"
+            status.write_text('{"state":"VPN connected"}\n', encoding="utf-8")
+            with patch.object(controller, "KIOSK_VARIANT", "baiamonte"), patch.object(controller, "CLOUDCONNEXA_STATUS", status):
+                self.assertEqual(
+                    controller.resolved_dashboard_url("http://192.168.0.10:8123"),
+                    "http://ha.dashboard.baiamonte:8123",
+                )
+                self.assertEqual(
+                    controller.resolved_dashboard_url("https://example.com"),
+                    "https://example.com",
+                )
+
+            status.write_text('{"state":"Local LAN"}\n', encoding="utf-8")
+            with patch.object(controller, "KIOSK_VARIANT", "baiamonte"), patch.object(controller, "CLOUDCONNEXA_STATUS", status):
+                self.assertEqual(
+                    controller.resolved_dashboard_url("http://192.168.0.10:8123"),
+                    "http://192.168.0.10:8123",
+                )
+
     def test_display_size_uses_current_hdmi_mode(self):
         result = MagicMock(stdout="HDMI-A-1\n  3840x2160 px, 60.000000 Hz (current)\n")
         with patch.object(controller.subprocess, "run", return_value=result):
@@ -121,11 +142,11 @@ class BrowserControllerTests(unittest.TestCase):
     def test_pi_four_dual_hdmi_uses_isolated_baiamonte_app(self):
         fake = MagicMock()
         with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
-            controller.launch_chromium(110, False, role="secondary", url="http://192.168.0.10:8101", output_name="HDMI-A-2", output_x=1920, dual=True)
+            controller.launch_chromium(110, False, role="secondary", url="http://192.168.0.10:8123", output_name="HDMI-A-2", output_x=1920, dual=True)
         command = popen.call_args.args[0]
         self.assertIn("--class=BaiamonteSecondary", command)
         self.assertIn("--remote-debugging-port=9223", command)
-        self.assertIn("--app=http://192.168.0.10:8101", command)
+        self.assertIn("--app=http://192.168.0.10:8123", command)
         self.assertIn("--ozone-platform=x11", command)
         self.assertIn("--window-position=1920,0", command)
         self.assertIn("--mute-audio", command)
@@ -191,7 +212,7 @@ class BrowserControllerTests(unittest.TestCase):
 
     def test_controller_keeps_boot_screen_and_retries_single_page_sites(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
-        self.assertIn("wait_for_page(config[\"pages\"][0][\"url\"], process)", source)
+        self.assertIn("wait_for_page(raw_config[\"pages\"][0][\"url\"], process)", source)
         self.assertIn("Kiosk page connection restored; reloaded automatically", source)
         self.assertIn("Baiamonte second display connection restored; reloaded automatically", source)
 
