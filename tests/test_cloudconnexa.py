@@ -2,6 +2,7 @@ import importlib.util
 import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "rahamin-kiosk-cloudconnexa"
@@ -29,6 +30,22 @@ class CloudConnexaFallbackTests(unittest.TestCase):
 
     def test_active_vpn_stays_connected_while_local_is_unavailable(self):
         self.assertEqual(self.module.desired_action(True, True, False, 2), ("connected", 0))
+
+    def test_vpn_routed_dashboard_is_not_mistaken_for_local(self):
+        with patch.object(self.module, "route_device", return_value="tun0"), \
+                patch.object(self.module, "connection_devices", return_value={"tun0"}), \
+                patch.object(self.module.socket, "create_connection") as connect:
+            self.assertFalse(self.module.direct_dashboard_reachable(vpn_active=True))
+            connect.assert_not_called()
+
+    def test_physical_lan_route_is_checked_while_vpn_is_active(self):
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        with patch.object(self.module, "route_device", return_value="wlan0"), \
+                patch.object(self.module, "connection_devices", return_value={"tun0"}), \
+                patch.object(self.module.socket, "create_connection", return_value=connection) as connect:
+            self.assertTrue(self.module.direct_dashboard_reachable(vpn_active=True))
+            connect.assert_called_once_with((self.module.TARGET_HOST, self.module.TARGET_PORT), timeout=4)
 
     def test_missing_private_profile_is_dormant(self):
         self.assertEqual(self.module.desired_action(False, False, False, 2), ("unconfigured", 0))

@@ -33,7 +33,29 @@ def write_status(state, detail):
     os.replace(temporary, STATUS)
 
 
-def direct_dashboard_reachable():
+def route_device(host):
+    """Return the interface Linux currently uses to reach *host*."""
+    result = run("ip", "-4", "route", "get", host)
+    if result.returncode != 0:
+        return ""
+    match = re.search(r"\bdev\s+(\S+)", result.stdout)
+    return match.group(1) if match else ""
+
+
+def connection_devices():
+    """Return interfaces owned by the active CloudConnexa connection."""
+    result = run("nmcli", "-g", "GENERAL.DEVICES", "connection", "show", CONNECTION)
+    if result.returncode != 0:
+        return set()
+    return {device.strip() for device in re.split(r"[,\s]+", result.stdout) if device.strip() and device.strip() != "--"}
+
+
+def direct_dashboard_reachable(vpn_active=False):
+    # A successful TCP connection through the VPN does not mean the dashboard
+    # has returned to the local LAN. Without this route check the watchdog can
+    # repeatedly connect and disconnect CloudConnexa.
+    if vpn_active and route_device(TARGET_HOST) in connection_devices():
+        return False
     try:
         with socket.create_connection((TARGET_HOST, TARGET_PORT), timeout=4):
             return True
@@ -106,7 +128,9 @@ def main():
                 continue
 
             import_profile()
-            action, failures = desired_action(True, connection_active(), direct_dashboard_reachable(), failures)
+            vpn_active = connection_active()
+            direct_reachable = direct_dashboard_reachable(vpn_active)
+            action, failures = desired_action(True, vpn_active, direct_reachable, failures)
             if action == "disconnect":
                 write_status("Disconnecting VPN", "Local Baiamonte dashboard is reachable again")
                 result = run("nmcli", "--wait", "30", "connection", "down", CONNECTION)
