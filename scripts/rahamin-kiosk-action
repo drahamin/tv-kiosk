@@ -21,8 +21,23 @@ case "${1:-}" in
     install -m 0600 -o kiosk -g kiosk /dev/null /home/kiosk/.config/tv-kiosk/display-disabled
     runuser -u kiosk -- env XDG_RUNTIME_DIR=/run/user/"$(id -u kiosk)" systemctl --user disable --now tv-kiosk-browser.service
     ;;
+  remove-vpn)
+    systemctl disable --now tv-kiosk-cloudconnexa.service >/dev/null 2>&1 || true
+    if nmcli -g connection.id connection show baiamonte-dashboard >/dev/null 2>&1; then
+      nmcli --wait 30 connection down baiamonte-dashboard >/dev/null 2>&1 || true
+      nmcli connection delete baiamonte-dashboard >/dev/null
+    fi
+    rm -f \
+      /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn \
+      /var/lib/rahamin-kiosk/cloudconnexa-profile.sha256 \
+      /run/tv-kiosk/cloudconnexa-status.json \
+      /home/kiosk/.config/systemd/user/tv-kiosk-browser.service.d/10-baiamonte-browser.conf
+    runuser -u kiosk -- env XDG_RUNTIME_DIR=/run/user/"$(id -u kiosk)" systemctl --user daemon-reload
+    runuser -u kiosk -- env XDG_RUNTIME_DIR=/run/user/"$(id -u kiosk)" systemctl --user restart tv-kiosk-browser.service
+    ;;
   *)
-    echo "Allowed actions: force-update, reboot, start-display, stop-display" >&2
+    echo "Allowed actions: force-update, reboot, start-display, stop-display, remove-vpn" >&2
     exit 2
     ;;
 esac
+
