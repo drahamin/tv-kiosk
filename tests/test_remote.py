@@ -57,7 +57,9 @@ class RemoteControlTests(unittest.TestCase):
         autostart = (ROOT / "session" / "labwc-autostart").read_text(encoding="utf-8")
         self.assertIn('action name="HideCursor"', config)
         self.assertIn('action name="WarpCursor"', config)
-        self.assertNotIn("ToggleFullscreen", config)
+        self.assertEqual(config.count('action name="ToggleFullscreen"'), 2)
+        self.assertIn('identifier="*RahaminPrimary*" serverDecoration="no"', config)
+        self.assertIn('identifier="*BaiamonteSecondary*" serverDecoration="no"', config)
         self.assertIn("wtype -M alt -M logo", autostart)
 
     def test_successful_updates_restart_remote_listener(self):

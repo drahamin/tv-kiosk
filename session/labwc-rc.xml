@@ -9,11 +9,13 @@
   <windowRules>
     <!-- Dual-HDMI Pi 4/5 mode launches undecorated app windows. Exact output
          geometry is enforced by browser-controller after both windows map. -->
-    <windowRule identifier="*RahaminPrimary*">
+    <windowRule identifier="*RahaminPrimary*" serverDecoration="no">
       <action name="MoveToOutput" output="HDMI-A-1" />
+      <action name="ToggleFullscreen" />
     </windowRule>
-    <windowRule identifier="*BaiamonteSecondary*">
+    <windowRule identifier="*BaiamonteSecondary*" serverDecoration="no">
       <action name="MoveToOutput" output="HDMI-A-2" />
+      <action name="ToggleFullscreen" />
     </windowRule>
     <!-- Chromium's native Wayland app-id varies across releases. The dual
          mode uses XWayland for deterministic coordinates, with this title
