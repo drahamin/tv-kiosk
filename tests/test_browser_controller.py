@@ -40,6 +40,23 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertTrue(command[-1].endswith("/session/boot.html?profile=multi&variant=auto"))
         self.assertNotIn("--mute-audio", command)
 
+    def test_fullscreen_is_idempotently_enforced_through_chromium(self):
+        with (
+            patch.object(controller, "devtools", return_value=[{"id": "page-1", "type": "page"}]),
+            patch.object(controller, "devtools_command", return_value={"windowId": 42, "bounds": {"windowState": "normal"}}) as command,
+        ):
+            self.assertTrue(controller.ensure_fullscreen())
+        self.assertEqual(command.call_args_list[0].args[:2], ("Browser.getWindowForTarget", {"targetId": "page-1"}))
+        self.assertEqual(command.call_args_list[1].args[:2], ("Browser.setWindowBounds", {"windowId": 42, "bounds": {"windowState": "fullscreen"}}))
+
+    def test_already_fullscreen_window_is_not_toggled_off(self):
+        with (
+            patch.object(controller, "devtools", return_value=[{"id": "page-1", "type": "page"}]),
+            patch.object(controller, "devtools_command", return_value={"windowId": 42, "bounds": {"windowState": "fullscreen"}}) as command,
+        ):
+            self.assertTrue(controller.ensure_fullscreen())
+        self.assertEqual(command.call_count, 1)
+
     def test_chromium_can_disable_audio_without_extra_processes(self):
         fake = MagicMock()
         with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:

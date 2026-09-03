@@ -3,7 +3,10 @@
 
 import json
 import os
+import base64
 import signal
+import socket
+import struct
 import subprocess
 import time
 import re
@@ -107,6 +110,75 @@ def devtools(path, method="GET", timeout=3, port=DEBUG_PORT):
         return json.loads(payload)
     except json.JSONDecodeError:
         return payload.decode("utf-8", errors="replace")
+
+
+def devtools_command(method, params=None, timeout=3, port=DEBUG_PORT):
+    """Send one browser-level Chrome DevTools Protocol command."""
+    version = devtools("/json/version", timeout=timeout, port=port)
+    parsed = urlparse(version["webSocketDebuggerUrl"])
+    if parsed.hostname not in ("127.0.0.1", "localhost"):
+        raise ValueError("Refusing a non-local Chromium control socket")
+    connection = socket.create_connection((parsed.hostname, parsed.port or port), timeout)
+    try:
+        key = base64.b64encode(os.urandom(16)).decode("ascii")
+        request = (
+            f"GET {parsed.path} HTTP/1.1\r\nHost: {parsed.hostname}:{parsed.port or port}\r\n"
+            "Upgrade: websocket\r\nConnection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
+        )
+        connection.sendall(request.encode("ascii"))
+        headers = b""
+        while b"\r\n\r\n" not in headers:
+            headers += connection.recv(4096)
+        if b" 101 " not in headers.split(b"\r\n", 1)[0]:
+            raise RuntimeError("Chromium rejected its local control socket")
+
+        payload = json.dumps({"id": 1, "method": method, "params": params or {}}).encode("utf-8")
+        mask = os.urandom(4)
+        frame = bytearray([0x81])
+        if len(payload) < 126:
+            frame.append(0x80 | len(payload))
+        elif len(payload) < 65536:
+            frame.append(0x80 | 126)
+            frame.extend(struct.pack("!H", len(payload)))
+        else:
+            frame.append(0x80 | 127)
+            frame.extend(struct.pack("!Q", len(payload)))
+        frame.extend(mask)
+        frame.extend(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+        connection.sendall(frame)
+
+        while True:
+            header = connection.recv(2)
+            if len(header) != 2:
+                raise RuntimeError("Chromium control socket closed")
+            length = header[1] & 0x7f
+            if length == 126:
+                length = struct.unpack("!H", connection.recv(2))[0]
+            elif length == 127:
+                length = struct.unpack("!Q", connection.recv(8))[0]
+            response = b""
+            while len(response) < length:
+                response += connection.recv(length - len(response))
+            decoded = json.loads(response)
+            if decoded.get("id") == 1:
+                if "error" in decoded:
+                    raise RuntimeError(decoded["error"].get("message", "Chromium command failed"))
+                return decoded.get("result", {})
+    finally:
+        connection.close()
+
+
+def ensure_fullscreen(port=DEBUG_PORT):
+    """Idempotently force the single-display browser over the entire HDMI canvas."""
+    targets = [target for target in devtools("/json/list", port=port) if target.get("type") == "page"]
+    if not targets:
+        return False
+    result = devtools_command("Browser.getWindowForTarget", {"targetId": targets[0]["id"]}, port=port)
+    window_id = result["windowId"]
+    if result.get("bounds", {}).get("windowState") != "fullscreen":
+        devtools_command("Browser.setWindowBounds", {"windowId": window_id, "bounds": {"windowState": "fullscreen"}}, port=port)
+    return True
 
 
 def wait_for_chromium(process, port=DEBUG_PORT):
@@ -441,6 +513,8 @@ def supervise():
             wait_for_chromium(process)
             if dual and not place_dual_windows(outputs, process, secondary_process):
                 print("Could not confirm dual-window placement; compositor rules remain active", flush=True)
+            elif not dual:
+                ensure_fullscreen()
             remaining_boot_time = BOOT_MIN_SECONDS - (time.monotonic() - launched_at)
             if remaining_boot_time > 0:
                 time.sleep(remaining_boot_time)
@@ -512,8 +586,11 @@ def supervise():
                 # newly navigated app page changes its native window title.
                 # Reassert the two exact HDMI canvases so no panel or border
                 # can reappear later in the rotation.
-                if dual and time.monotonic() >= next_geometry_check:
-                    place_dual_windows(outputs, process, secondary_process)
+                if time.monotonic() >= next_geometry_check:
+                    if dual:
+                        place_dual_windows(outputs, process, secondary_process)
+                    else:
+                        ensure_fullscreen()
                     next_geometry_check = time.monotonic() + 5
                 time.sleep(1)
         except Exception as exc:
