@@ -129,8 +129,21 @@ def websocket_command(websocket_url, method, params=None, timeout=3):
         headers = b""
         while b"\r\n\r\n" not in headers:
             headers += connection.recv(4096)
-        if b" 101 " not in headers.split(b"\r\n", 1)[0]:
+        response_headers, pending = headers.split(b"\r\n\r\n", 1)
+        if b" 101 " not in response_headers.split(b"\r\n", 1)[0]:
             raise RuntimeError("Chromium rejected its local control socket")
+
+        buffered = bytearray(pending)
+
+        def receive(count):
+            while len(buffered) < count:
+                chunk = connection.recv(max(4096, count - len(buffered)))
+                if not chunk:
+                    raise RuntimeError("Chromium control socket closed")
+                buffered.extend(chunk)
+            result = bytes(buffered[:count])
+            del buffered[:count]
+            return result
 
         payload = json.dumps({"id": 1, "method": method, "params": params or {}}).encode("utf-8")
         mask = os.urandom(4)
@@ -148,17 +161,13 @@ def websocket_command(websocket_url, method, params=None, timeout=3):
         connection.sendall(frame)
 
         while True:
-            header = connection.recv(2)
-            if len(header) != 2:
-                raise RuntimeError("Chromium control socket closed")
+            header = receive(2)
             length = header[1] & 0x7f
             if length == 126:
-                length = struct.unpack("!H", connection.recv(2))[0]
+                length = struct.unpack("!H", receive(2))[0]
             elif length == 127:
-                length = struct.unpack("!Q", connection.recv(8))[0]
-            response = b""
-            while len(response) < length:
-                response += connection.recv(length - len(response))
+                length = struct.unpack("!Q", receive(8))[0]
+            response = receive(length)
             decoded = json.loads(response)
             if decoded.get("id") == 1:
                 if "error" in decoded:
