@@ -258,6 +258,25 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in closed.call_args_list], ["old", "blank"])
         self.assertTrue(all(call.kwargs == {"port": controller.DEBUG_PORT} for call in closed.call_args_list))
 
+    def test_dual_display_navigation_preserves_borderless_app_window(self):
+        target = {"id": "app-window", "type": "page", "webSocketDebuggerUrl": "ws://127.0.0.1:9222/devtools/page/app-window"}
+        with (
+            patch.object(controller, "devtools", return_value=[target]),
+            patch.object(controller, "websocket_command") as command,
+            patch.object(controller, "activate") as activate,
+        ):
+            result = controller.navigate_app_window("http://example.test/tv")
+        self.assertEqual(result, "app-window")
+        command.assert_called_once_with(target["webSocketDebuggerUrl"], "Page.navigate", {"url": "http://example.test/tv"})
+        activate.assert_called_once_with("app-window", port=controller.DEBUG_PORT)
+
+    def test_show_page_uses_app_navigation_only_when_requested(self):
+        with patch.object(controller, "navigate_app_window", return_value="app") as navigate, patch.object(controller, "replace_tab", return_value="tab") as replace:
+            self.assertEqual(controller.show_page("http://example.test", preserve_app_window=True), "app")
+            self.assertEqual(controller.show_page("http://example.test", preserve_app_window=False), "tab")
+        navigate.assert_called_once()
+        replace.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

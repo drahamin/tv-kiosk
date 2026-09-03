@@ -112,17 +112,16 @@ def devtools(path, method="GET", timeout=3, port=DEBUG_PORT):
         return payload.decode("utf-8", errors="replace")
 
 
-def devtools_command(method, params=None, timeout=3, port=DEBUG_PORT):
-    """Send one browser-level Chrome DevTools Protocol command."""
-    version = devtools("/json/version", timeout=timeout, port=port)
-    parsed = urlparse(version["webSocketDebuggerUrl"])
+def websocket_command(websocket_url, method, params=None, timeout=3):
+    """Send one Chrome DevTools Protocol command to a local WebSocket."""
+    parsed = urlparse(websocket_url)
     if parsed.hostname not in ("127.0.0.1", "localhost"):
         raise ValueError("Refusing a non-local Chromium control socket")
-    connection = socket.create_connection((parsed.hostname, parsed.port or port), timeout)
+    connection = socket.create_connection((parsed.hostname, parsed.port or DEBUG_PORT), timeout)
     try:
         key = base64.b64encode(os.urandom(16)).decode("ascii")
         request = (
-            f"GET {parsed.path} HTTP/1.1\r\nHost: {parsed.hostname}:{parsed.port or port}\r\n"
+            f"GET {parsed.path} HTTP/1.1\r\nHost: {parsed.hostname}:{parsed.port or DEBUG_PORT}\r\n"
             "Upgrade: websocket\r\nConnection: Upgrade\r\n"
             f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
         )
@@ -169,6 +168,12 @@ def devtools_command(method, params=None, timeout=3, port=DEBUG_PORT):
         connection.close()
 
 
+def devtools_command(method, params=None, timeout=3, port=DEBUG_PORT):
+    """Send one browser-level Chrome DevTools Protocol command."""
+    version = devtools("/json/version", timeout=timeout, port=port)
+    return websocket_command(version["webSocketDebuggerUrl"], method, params, timeout)
+
+
 def ensure_fullscreen(port=DEBUG_PORT):
     """Idempotently force the single-display browser over the entire HDMI canvas."""
     targets = [target for target in devtools("/json/list", port=port) if target.get("type") == "page"]
@@ -179,6 +184,26 @@ def ensure_fullscreen(port=DEBUG_PORT):
     if result.get("bounds", {}).get("windowState") != "fullscreen":
         devtools_command("Browser.setWindowBounds", {"windowId": window_id, "bounds": {"windowState": "fullscreen"}}, port=port)
     return True
+
+
+def navigate_app_window(url, tab_id=None, port=DEBUG_PORT):
+    """Navigate the existing app window without creating browser chrome."""
+    targets = [target for target in devtools("/json/list", port=port) if target.get("type") == "page"]
+    target = next((item for item in targets if item.get("id") == tab_id), targets[0] if targets else None)
+    if target is None:
+        return replace_tab(url, tab_id, port)
+    websocket_command(target["webSocketDebuggerUrl"], "Page.navigate", {"url": url})
+    activate(target["id"], port=port)
+    for extra in targets:
+        if extra.get("id") != target["id"]:
+            close(extra["id"], port=port)
+    return target["id"]
+
+
+def show_page(url, old_id=None, port=DEBUG_PORT, preserve_app_window=False):
+    if preserve_app_window:
+        return navigate_app_window(url, old_id, port)
+    return replace_tab(url, old_id, port)
 
 
 def wait_for_chromium(process, port=DEBUG_PORT):
@@ -547,7 +572,7 @@ def supervise():
                         if not reachable_url:
                             break
                         config["pages"][0]["url"] = reachable_url
-                    tab_id = replace_tab(config["pages"][0]["url"], tab_id)
+                    tab_id = show_page(config["pages"][0]["url"], tab_id, preserve_app_window=dual)
                     fingerprint = new_fingerprint
                     current = 0
                     next_rotation = float("inf") if len(config["pages"]) == 1 else time.monotonic() + config["rotation_seconds"]
@@ -556,14 +581,14 @@ def supervise():
                 if len(config["pages"]) == 1 and now >= next_page_health_check:
                     reachable = page_reachable(config["pages"][0]["url"])
                     if reachable and current_page_was_unreachable:
-                        tab_id = replace_tab(config["pages"][0]["url"], tab_id)
+                        tab_id = show_page(config["pages"][0]["url"], tab_id, preserve_app_window=dual)
                         print("Kiosk page connection restored; reloaded automatically", flush=True)
                     current_page_was_unreachable = not reachable
                     next_page_health_check = now + PAGE_HEALTH_SECONDS
                 if secondary_process is not None and now >= next_secondary_retry:
                     reachable = page_reachable(secondary_url)
                     if reachable and (secondary_waiting or secondary_was_unreachable):
-                        secondary_tab_id = replace_tab(secondary_url, secondary_tab_id, port=DEBUG_PORT + 1)
+                        secondary_tab_id = show_page(secondary_url, secondary_tab_id, port=DEBUG_PORT + 1, preserve_app_window=True)
                         secondary_waiting = False
                         print("Baiamonte second display connection restored; reloaded automatically", flush=True)
                     secondary_was_unreachable = not reachable
@@ -572,14 +597,14 @@ def supervise():
                     step = requested_step
                     requested_step = 0
                     current = (current + step) % len(config["pages"])
-                    tab_id = replace_tab(config["pages"][current]["url"], tab_id)
+                    tab_id = show_page(config["pages"][current]["url"], tab_id, preserve_app_window=dual)
                     print(f"Remote selected page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                 elif requested_step:
                     requested_step = 0
                 if time.monotonic() >= next_rotation:
                     current = (current + 1) % len(config["pages"])
-                    tab_id = replace_tab(config["pages"][current]["url"], tab_id)
+                    tab_id = show_page(config["pages"][current]["url"], tab_id, preserve_app_window=dual)
                     print(f"Showing page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                 # Chromium can reapply the desktop work-area geometry when a
