@@ -395,13 +395,19 @@ def place_dual_windows(outputs, primary_process, secondary_process):
                 break
             windows.append((ids[-1], output, x_position))
         if len(windows) == 2:
-            for window_id, output, x_position in windows:
-                subprocess.run([
-                    "xdotool", "windowmove", "--sync", window_id, str(x_position), "0",
-                    "windowsize", "--sync", window_id, str(output["width"]), str(output["height"]),
-                ], check=False, timeout=5)
-            subprocess.run(["xdotool", "windowraise", windows[0][0]], check=False, timeout=3)
-            return True
+            try:
+                for window_id, output, x_position in windows:
+                    # XWayland does not reliably acknowledge --sync geometry
+                    # requests. Fire-and-forget placement keeps a slow window
+                    # manager from restarting both kiosk browsers.
+                    subprocess.run([
+                        "xdotool", "windowmove", window_id, str(x_position), "0",
+                        "windowsize", window_id, str(output["width"]), str(output["height"]),
+                    ], check=False, timeout=3)
+                subprocess.run(["xdotool", "windowraise", windows[0][0]], check=False, timeout=3)
+                return True
+            except (OSError, subprocess.SubprocessError):
+                return False
         time.sleep(0.25)
     return False
 

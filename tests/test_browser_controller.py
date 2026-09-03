@@ -203,8 +203,21 @@ class BrowserControllerTests(unittest.TestCase):
         commands = [call.args[0] for call in run.call_args_list]
         self.assertIn(["xdotool", "search", "--onlyvisible", "--pid", "1111"], commands)
         self.assertIn(["xdotool", "search", "--onlyvisible", "--pid", "2222"], commands)
-        self.assertTrue(any(command[:5] == ["xdotool", "windowmove", "--sync", "202", "1920"] for command in commands))
+        self.assertTrue(any(command[:4] == ["xdotool", "windowmove", "202", "1920"] for command in commands))
+        self.assertFalse(any("--sync" in command for command in commands))
         self.assertFalse(any("windowstate" in command for command in commands))
+
+    def test_dual_window_placement_timeout_is_nonfatal(self):
+        outputs = [
+            {"name": "HDMI-A-1", "width": 1920, "height": 1080},
+            {"name": "HDMI-A-2", "width": 1920, "height": 1080},
+        ]
+        primary = MagicMock(pid=1111)
+        secondary = MagicMock(pid=2222)
+        searches = [MagicMock(stdout="101\n"), MagicMock(stdout="202\n")]
+        timeout = controller.subprocess.TimeoutExpired(["xdotool"], 3)
+        with patch.object(controller.subprocess, "run", side_effect=searches + [timeout]):
+            self.assertFalse(controller.place_dual_windows(outputs, primary, secondary))
 
     def test_dual_geometry_is_reasserted_after_page_navigation(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
