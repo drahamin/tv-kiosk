@@ -57,6 +57,11 @@ class BrowserControllerTests(unittest.TestCase):
             self.assertTrue(controller.ensure_fullscreen())
         self.assertEqual(command.call_count, 1)
 
+    def test_fullscreen_acknowledgement_timeout_is_nonfatal(self):
+        with patch.object(controller, "ensure_fullscreen", side_effect=[TimeoutError("slow"), True]) as ensure:
+            controller.enforce_fullscreen((9222, 9223))
+        self.assertEqual([call.args[0] for call in ensure.call_args_list], [9222, 9223])
+
     def test_chromium_can_disable_audio_without_extra_processes(self):
         fake = MagicMock()
         with tempfile.TemporaryDirectory() as directory, patch.object(controller, "STATE_DIR", Path(directory)), patch.object(controller, "display_size", return_value=(1920, 1080)), patch.object(controller.subprocess, "Popen", return_value=fake) as popen:
@@ -223,6 +228,7 @@ class BrowserControllerTests(unittest.TestCase):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("next_geometry_check", source)
         self.assertIn("place_dual_windows(outputs, process, secondary_process)", source)
+        self.assertIn("enforce_fullscreen((DEBUG_PORT, DEBUG_PORT + 1) if dual else (DEBUG_PORT,))", source)
 
     def test_devtools_accepts_plain_text_activation_response(self):
         response = MagicMock()

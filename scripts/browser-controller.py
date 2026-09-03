@@ -195,6 +195,15 @@ def ensure_fullscreen(port=DEBUG_PORT):
     return True
 
 
+def enforce_fullscreen(ports):
+    """Best-effort fullscreen enforcement that never restarts healthy pages."""
+    for port in ports:
+        try:
+            ensure_fullscreen(port)
+        except (OSError, URLError, ValueError, RuntimeError) as exc:
+            print(f"Chromium fullscreen acknowledgement delayed on port {port}: {exc}", flush=True)
+
+
 def navigate_app_window(url, tab_id=None, port=DEBUG_PORT):
     """Navigate the existing app window without creating browser chrome."""
     targets = [target for target in devtools("/json/list", port=port) if target.get("type") == "page"]
@@ -562,8 +571,7 @@ def supervise():
             wait_for_chromium(process)
             if dual and not place_dual_windows(outputs, process, secondary_process):
                 print("Could not confirm dual-window placement; compositor rules remain active", flush=True)
-            elif not dual:
-                ensure_fullscreen()
+            enforce_fullscreen((DEBUG_PORT, DEBUG_PORT + 1) if dual else (DEBUG_PORT,))
             remaining_boot_time = BOOT_MIN_SECONDS - (time.monotonic() - launched_at)
             if remaining_boot_time > 0:
                 time.sleep(remaining_boot_time)
@@ -638,8 +646,7 @@ def supervise():
                 if time.monotonic() >= next_geometry_check:
                     if dual:
                         place_dual_windows(outputs, process, secondary_process)
-                    else:
-                        ensure_fullscreen()
+                    enforce_fullscreen((DEBUG_PORT, DEBUG_PORT + 1) if dual else (DEBUG_PORT,))
                     next_geometry_check = time.monotonic() + 5
                 time.sleep(1)
         except Exception as exc:
