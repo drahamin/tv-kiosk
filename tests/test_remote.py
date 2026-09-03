@@ -25,6 +25,9 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn('--kill-whom=main --signal=SIGUSR1 tv-kiosk-browser.service', script)
         self.assertIn('--kill-whom=main --signal=SIGUSR2 tv-kiosk-browser.service', script)
         self.assertIn("cec-client -t p -d 31", script)
+        self.assertIn("find_cec_device", script)
+        self.assertIn('grep -q "device #0: TV"', script)
+        self.assertIn('"$cec_device" </dev/null', script)
         self.assertIn("</dev/null", script)
         self.assertNotIn("printf 'as\\n'", script)
 

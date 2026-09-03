@@ -4,6 +4,22 @@ set -u
 
 KIOSK_VARIANT=${KIOSK_VARIANT:-auto}
 
+find_cec_device() {
+  fallback=
+  for device in /dev/cec*; do
+    [ -c "$device" ] || continue
+    [ -n "$fallback" ] || fallback=$device
+    # A Pi 4/5 exposes one CEC adapter per HDMI connector. Probe without
+    # changing power or active-source state and prefer the bus that sees a TV.
+    if printf 'scan\n' | timeout 7 cec-client -s -d 8 -t p -o "Rahamin Kiosk" "$device" 2>&1 |
+      grep -q "device #0: TV"; then
+      printf '%s\n' "$device"
+      return
+    fi
+  done
+  printf '%s\n' "$fallback"
+}
+
 send_key() {
   wtype -P "$1" -p "$1"
 }
@@ -61,7 +77,14 @@ while :; do
   # (active-source) command here: it powers on many Samsung TVs and selects
   # the Pi's HDMI input whenever this service or the GitHub updater restarts.
   # When the TV is already on this listener still receives its Anynet+ keys.
-  cec-client -t p -d 31 -o "Rahamin Kiosk" </dev/null 2>&1 | while IFS= read -r line; do
+  cec_device=$(find_cec_device)
+  if [ -z "$cec_device" ]; then
+    echo "No HDMI-CEC adapter found; retrying in 5 seconds" >&2
+    sleep 5
+    continue
+  fi
+  echo "Listening for Samsung remote commands on $cec_device"
+  cec-client -t p -d 31 -o "Rahamin Kiosk" "$cec_device" </dev/null 2>&1 | while IFS= read -r line; do
     case "$line" in
       # libCEC 6 and 7 format key events differently. Accept both forms and
       # suppress the duplicate detail/canonical pair emitted for each press.
