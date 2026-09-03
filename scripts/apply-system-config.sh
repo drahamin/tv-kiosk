@@ -186,6 +186,20 @@ if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc network-manager-openvpn openvpn wlr-randr wtype xdotool $BROWSER_PACKAGE
 fi
 
+# Pi Zero requires 2.4 GHz. Pi 4/5 kiosks prefer the less congested 5 GHz
+# radio for full-screen dashboards, maps, and updates. An original Pi 3 is
+# left on automatic band selection because some models are 2.4 GHz-only.
+case "$HARDWARE_MODEL" in
+  *"Raspberry Pi Zero"*) WIFI_BAND=bg ;;
+  *"Raspberry Pi 4"*|*"Raspberry Pi 5"*) WIFI_BAND=a ;;
+  *) WIFI_BAND= ;;
+esac
+for WIFI_CONNECTION in "Rahamin WiFi Home" "Rahamin WiFi Baiamonte"; do
+  if nmcli connection show "$WIFI_CONNECTION" >/dev/null 2>&1; then
+    nmcli connection modify "$WIFI_CONNECTION" 802-11-wireless.band "$WIFI_BAND" || true
+  fi
+done
+
 # Older builds selected Openbox even though the optimized Chromium and CEC
 # units use native Wayland. Keep every update pinned to the matching labwc
 # session so the browser starts full-screen instead of waiting indefinitely.

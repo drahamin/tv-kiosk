@@ -61,6 +61,18 @@ def device_for(kind, fallback):
     return fallback
 
 
+def preferred_wifi_band():
+    try:
+        model = Path("/proc/device-tree/model").read_bytes().replace(b"\0", b"").decode("utf-8", "replace")
+    except OSError:
+        model = ""
+    if "Raspberry Pi Zero" in model:
+        return "bg"
+    if "Raspberry Pi 4" in model or "Raspberry Pi 5" in model:
+        return "a"
+    return ""
+
+
 def apply_ip(connection, prefix, data, version):
     family = f"ipv{version}"
     mode = data[f"{prefix}_mode"]
@@ -95,7 +107,7 @@ def apply(data):
     # works when those networks are visible and lets an unattended kiosk recover
     # after an access point changes its broadcast setting.
     wifi_hidden = "yes" if data["wifi_ssid"] in ("Home", "Baiamonte") else "no"
-    run("nmcli", "connection", "modify", wifi, "connection.autoconnect", "yes" if data["wifi_autoconnect"] else "no", "802-11-wireless.ssid", data["wifi_ssid"], "802-11-wireless.hidden", wifi_hidden)
+    run("nmcli", "connection", "modify", wifi, "connection.autoconnect", "yes" if data["wifi_autoconnect"] else "no", "802-11-wireless.ssid", data["wifi_ssid"], "802-11-wireless.hidden", wifi_hidden, "802-11-wireless.band", preferred_wifi_band())
     if data["wifi_mac_policy"] == "preserve":
         run("nmcli", "connection", "modify", wifi, "802-11-wireless.cloned-mac-address", "preserve")
     else:

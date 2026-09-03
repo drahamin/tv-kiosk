@@ -72,6 +72,8 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn('"/home/$KIOSK_USER/.ssh/authorized_keys"', setup)
         self.assertEqual(updater.count('git merge --ff-only "$target"'), 1)
         self.assertLess(updater.index('git fetch --quiet origin "$BRANCH"'), updater.index('git merge --ff-only "$target"'))
+        self.assertIn('WIFI_BAND=a', setup)
+        self.assertIn('WIFI_BAND=bg', setup)
 
     def test_system_repair_unlocks_only_invalid_kiosk_accounts(self):
         setup = (ROOT / "scripts" / "apply-system-config.sh").read_text(encoding="utf-8")

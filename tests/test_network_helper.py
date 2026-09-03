@@ -16,6 +16,13 @@ class NetworkHelperTests(unittest.TestCase):
         self.assertIn('(\"Home\", \"Baiamonte\")', source)
         self.assertIn('"802-11-wireless.hidden", wifi_hidden', source)
 
+    def test_wifi_band_is_selected_by_hardware(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("def preferred_wifi_band", source)
+        self.assertIn('"Raspberry Pi Zero"', source)
+        self.assertIn('"Raspberry Pi 5"', source)
+        self.assertIn('"802-11-wireless.band", preferred_wifi_band()', source)
+
     def test_hostname_validation(self):
         self.assertTrue(helper.valid_hostname("rahamin-kiosk"))
         self.assertFalse(helper.valid_hostname("bad hostname"))
