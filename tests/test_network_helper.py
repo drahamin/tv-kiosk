@@ -11,6 +11,11 @@ loader.exec_module(helper)
 
 
 class NetworkHelperTests(unittest.TestCase):
+    def test_approved_wifi_profiles_support_hidden_ssids(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn('(\"Home\", \"Baiamonte\")', source)
+        self.assertIn('"802-11-wireless.hidden", wifi_hidden', source)
+
     def test_hostname_validation(self):
         self.assertTrue(helper.valid_hostname("rahamin-kiosk"))
         self.assertFalse(helper.valid_hostname("bad hostname"))

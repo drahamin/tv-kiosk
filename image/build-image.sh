@@ -139,6 +139,7 @@ autoconnect-retries=0
 mode=infrastructure
 ssid=$escaped_ssid
 band=bg
+hidden=true
 powersave=2
 
 [wifi-security]

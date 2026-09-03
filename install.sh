@@ -131,7 +131,7 @@ if [ -n "$WIFI_PSK" ]; then
     wifi_priority=${wifi_spec##*:}
     wifi_name="Rahamin WiFi $wifi_ssid"
     nmcli connection show "$wifi_name" >/dev/null 2>&1 || nmcli connection add type wifi ifname wlan0 con-name "$wifi_name" ssid "$wifi_ssid"
-    nmcli connection modify "$wifi_name" connection.autoconnect yes connection.autoconnect-priority "$wifi_priority" connection.autoconnect-retries 0 802-11-wireless.band bg 802-11-wireless.powersave 2 ipv4.method auto ipv6.method auto wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PSK"
+    nmcli connection modify "$wifi_name" connection.autoconnect yes connection.autoconnect-priority "$wifi_priority" connection.autoconnect-retries 0 802-11-wireless.band bg 802-11-wireless.hidden yes 802-11-wireless.powersave 2 ipv4.method auto ipv6.method auto wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PSK"
   done
 fi
 

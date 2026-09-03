@@ -91,7 +91,11 @@ def apply(data):
     run("hostnamectl", "set-hostname", data["hostname"])
     wifi_device = device_for("wifi", "wlan0")
     wifi = connection_for(wifi_device, "Rahamin WiFi", "wifi")
-    run("nmcli", "connection", "modify", wifi, "connection.autoconnect", "yes" if data["wifi_autoconnect"] else "no", "802-11-wireless.ssid", data["wifi_ssid"])
+    # Home and Baiamonte may be configured as hidden SSIDs. Active probing also
+    # works when those networks are visible and lets an unattended kiosk recover
+    # after an access point changes its broadcast setting.
+    wifi_hidden = "yes" if data["wifi_ssid"] in ("Home", "Baiamonte") else "no"
+    run("nmcli", "connection", "modify", wifi, "connection.autoconnect", "yes" if data["wifi_autoconnect"] else "no", "802-11-wireless.ssid", data["wifi_ssid"], "802-11-wireless.hidden", wifi_hidden)
     if data["wifi_mac_policy"] == "preserve":
         run("nmcli", "connection", "modify", wifi, "802-11-wireless.cloned-mac-address", "preserve")
     else:
