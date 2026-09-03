@@ -280,8 +280,17 @@ class BrowserControllerTests(unittest.TestCase):
         ):
             result = controller.navigate_app_window("http://example.test/tv")
         self.assertEqual(result, "app-window")
-        command.assert_called_once_with(target["webSocketDebuggerUrl"], "Page.navigate", {"url": "http://example.test/tv"})
+        command.assert_called_once_with(target["webSocketDebuggerUrl"], "Page.navigate", {"url": "http://example.test/tv"}, timeout=12)
         activate.assert_called_once_with("app-window", port=controller.DEBUG_PORT)
+
+    def test_slow_dual_navigation_acknowledgement_does_not_restart_browser(self):
+        target = {"id": "app-window", "type": "page", "webSocketDebuggerUrl": "ws://127.0.0.1:9222/devtools/page/app-window"}
+        with (
+            patch.object(controller, "devtools", return_value=[target]),
+            patch.object(controller, "websocket_command", side_effect=TimeoutError("slow")),
+            patch.object(controller, "activate", side_effect=TimeoutError("slow")),
+        ):
+            self.assertEqual(controller.navigate_app_window("http://example.test/tv"), "app-window")
 
     def test_show_page_uses_app_navigation_only_when_requested(self):
         with patch.object(controller, "navigate_app_window", return_value="app") as navigate, patch.object(controller, "replace_tab", return_value="tab") as replace:

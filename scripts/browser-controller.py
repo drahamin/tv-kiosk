@@ -201,8 +201,17 @@ def navigate_app_window(url, tab_id=None, port=DEBUG_PORT):
     target = next((item for item in targets if item.get("id") == tab_id), targets[0] if targets else None)
     if target is None:
         return replace_tab(url, tab_id, port)
-    websocket_command(target["webSocketDebuggerUrl"], "Page.navigate", {"url": url})
-    activate(target["id"], port=port)
+    try:
+        # Busy dual-4K starts can acknowledge navigation slowly even after the
+        # renderer has accepted it. A late local CDP reply must never become a
+        # reason to tear down two healthy browser windows.
+        websocket_command(target["webSocketDebuggerUrl"], "Page.navigate", {"url": url}, timeout=12)
+    except (OSError, URLError, ValueError, RuntimeError) as exc:
+        print(f"Chromium navigation acknowledgement delayed: {exc}", flush=True)
+    try:
+        activate(target["id"], port=port)
+    except (OSError, URLError, ValueError):
+        pass
     for extra in targets:
         if extra.get("id") != target["id"]:
             close(extra["id"], port=port)
