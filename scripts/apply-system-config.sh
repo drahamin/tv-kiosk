@@ -147,10 +147,12 @@ EOF
 fi
 
 # Full KMS on current Raspberry Pi OS does not consistently honor the legacy
-# hdmi_force_hotplug setting after a Samsung TV drops HPD. Force both digital
-# connectors into the last verified stable dual-TV mode on Rahamin Pi 4/5
-# units. This keeps the compositor's two-output layout present while either TV
-# is booting, changing inputs, or briefly sleeping.
+# hdmi_force_hotplug setting after the primary TV drops HPD. Keep a forced
+# fallback only on HDMI-A-1. HDMI-A-2 must remain EDID-driven: forcing that
+# connector with the kernel's `D` flag prevents vc4_hdmi from publishing the
+# Samsung TV's CEC physical address and can also leave a 1080p TV looking like
+# a failed 4K mode. The browser controller restores the second output when its
+# real HPD/EDID returns.
 BOOT_CMDLINE=/boot/firmware/cmdline.txt
 [ -f "$BOOT_CMDLINE" ] || BOOT_CMDLINE=/boot/cmdline.txt
 if [ "${KIOSK_VARIANT:-auto}" != rahamin ]; then
@@ -169,7 +171,7 @@ path, variant, model = sys.argv[1:]
 with open(path, encoding="utf-8") as handle:
     tokens = handle.read().split()
 tokens = [token for token in tokens if not token.startswith(("video=HDMI-A-1:", "video=HDMI-A-2:"))]
-tokens.extend(("video=HDMI-A-1:3840x2160@30D", "video=HDMI-A-2:3840x2160@30D"))
+tokens.append("video=HDMI-A-1:3840x2160@30D")
 with open(path, "w", encoding="utf-8") as handle:
     handle.write(" ".join(tokens) + "\n")
 PY
