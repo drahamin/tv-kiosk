@@ -6,18 +6,32 @@ KIOSK_VARIANT=${KIOSK_VARIANT:-auto}
 
 find_cec_device() {
   fallback=
+  device_count=0
   for device in /dev/cec*; do
     [ -c "$device" ] || continue
+    device_count=$((device_count + 1))
     [ -n "$fallback" ] || fallback=$device
     # A Pi 4/5 exposes one CEC adapter per HDMI connector. Probe without
-    # changing power or active-source state and prefer the bus that sees a TV.
+    # changing power or active-source state and prefer an adapter whose DRM
+    # connector has received a real physical address from EDID. This remains
+    # reliable during boot, before libCEC's active scan can see the TV.
+    if command -v cec-ctl >/dev/null 2>&1 &&
+      timeout 5 cec-ctl -d "$device" 2>/dev/null |
+      grep -Eq 'Physical Address[[:space:]]*:[[:space:]]*[0-9a-e]\.[0-9a-e]\.[0-9a-e]\.[0-9a-e]'; then
+      printf '%s\n' "$device"
+      return
+    fi
     if printf 'scan\n' | timeout 7 cec-client -s -d 8 -t p -o "Rahamin Kiosk" "$device" 2>&1 |
       grep -q "device #0: TV"; then
       printf '%s\n' "$device"
       return
     fi
   done
-  printf '%s\n' "$fallback"
+  # A single-adapter Pi can safely use its only device. With dual HDMI, an
+  # unaddressed fallback is usually the wrong connector, so wait and retry.
+  if [ "$device_count" -eq 1 ]; then
+    printf '%s\n' "$fallback"
+  fi
 }
 
 send_key() {
