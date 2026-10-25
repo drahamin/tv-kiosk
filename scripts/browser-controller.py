@@ -33,6 +33,7 @@ requested_step = 0
 BOOT_MIN_SECONDS = 4
 PAGE_RETRY_SECONDS = 15
 PAGE_HEALTH_SECONDS = 30
+OFFLINE_RELOAD_SECONDS = 300
 
 
 def stop(_signum, _frame):
@@ -287,6 +288,26 @@ def page_reachable(url, timeout=6):
         # A 401, 403, or 405 still proves that the web server is available.
         return True
     except (OSError, URLError, ValueError):
+        return False
+
+
+def page_reports_offline(tab_id=None, port=DEBUG_PORT):
+    """Detect the vineyard display's visible stale-connection banner."""
+    try:
+        targets = [target for target in devtools("/json/list", port=port) if target.get("type") == "page"]
+        target = next((item for item in targets if item.get("id") == tab_id), targets[0] if targets else None)
+        if target is None:
+            return False
+        result = websocket_command(
+            target["webSocketDebuggerUrl"],
+            "Runtime.evaluate",
+            {
+                "expression": "Boolean(document.getElementById('offline') && !document.getElementById('offline').hidden)",
+                "returnByValue": True,
+            },
+        )
+        return bool(result.get("result", {}).get("value"))
+    except (OSError, URLError, ValueError, RuntimeError, KeyError):
         return False
 
 
@@ -580,6 +601,7 @@ def supervise():
             next_rotation = 0
             next_geometry_check = 0
             next_page_health_check = 0
+            last_offline_reload = float("-inf")
             next_secondary_retry = 0
             current_page_was_unreachable = False
             secondary_was_unreachable = secondary_waiting
@@ -612,9 +634,15 @@ def supervise():
                 now = time.monotonic()
                 if len(config["pages"]) == 1 and now >= next_page_health_check:
                     reachable = page_reachable(config["pages"][0]["url"])
-                    if reachable and current_page_was_unreachable:
+                    stale_page = reachable and page_reports_offline(tab_id)
+                    should_reload_stale = stale_page and now - last_offline_reload >= OFFLINE_RELOAD_SECONDS
+                    if reachable and (current_page_was_unreachable or should_reload_stale):
                         tab_id = show_page(config["pages"][0]["url"], tab_id, preserve_app_window=dual)
-                        print("Kiosk page connection restored; reloaded automatically", flush=True)
+                        if should_reload_stale:
+                            last_offline_reload = now
+                            print("Kiosk page reported a stale connection; reloaded automatically", flush=True)
+                        else:
+                            print("Kiosk page connection restored; reloaded automatically", flush=True)
                     current_page_was_unreachable = not reachable
                     next_page_health_check = now + PAGE_HEALTH_SECONDS
                 if secondary_process is not None and now >= next_secondary_retry:

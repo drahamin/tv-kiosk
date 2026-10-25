@@ -246,10 +246,21 @@ class BrowserControllerTests(unittest.TestCase):
         with patch.object(controller, "urlopen", side_effect=controller.URLError("offline")):
             self.assertFalse(controller.page_reachable("http://example.test/tv"))
 
+    def test_visible_offline_banner_is_detected_through_devtools(self):
+        target = {"id": "page-1", "type": "page", "webSocketDebuggerUrl": "ws://127.0.0.1:9222/devtools/page/page-1"}
+        with (
+            patch.object(controller, "devtools", return_value=[target]),
+            patch.object(controller, "websocket_command", return_value={"result": {"type": "boolean", "value": True}}) as command,
+        ):
+            self.assertTrue(controller.page_reports_offline("page-1"))
+        self.assertEqual(command.call_args.args[1], "Runtime.evaluate")
+        self.assertIn("getElementById('offline')", command.call_args.args[2]["expression"])
+
     def test_controller_keeps_boot_screen_and_retries_single_page_sites(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("wait_for_page(raw_config[\"pages\"][0][\"url\"], process)", source)
         self.assertIn("Kiosk page connection restored; reloaded automatically", source)
+        self.assertIn("Kiosk page reported a stale connection; reloaded automatically", source)
         self.assertIn("Baiamonte second display connection restored; reloaded automatically", source)
 
     def test_chromium_startup_allows_slow_dual_4k_profiles(self):
