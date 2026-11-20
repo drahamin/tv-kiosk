@@ -3,6 +3,7 @@ image/config.local.env
 image/kiosk_admin_ed25519
 image/kiosk_admin_ed25519.pub
 image/*.ovpn
+image/*access*.json
 *.img
 *.img.xz
 *.zip
