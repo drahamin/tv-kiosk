@@ -50,6 +50,11 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn("WIFI_SECONDARY_SSID", builder)
         self.assertIn("WIFI_PRIMARY_PSK", builder)
         self.assertIn("WIFI_SECONDARY_PSK", builder)
+
+    def test_image_builder_excludes_generated_python_caches(self):
+        builder = (ROOT / "image" / "build-image.sh").read_text()
+        self.assertIn("--exclude='__pycache__'", builder)
+        self.assertIn("--exclude='*.py[co]'", builder)
         self.assertIn("Rahamin-Home", builder)
         self.assertIn("Rahamin-Baiamonte", builder)
         self.assertIn("KIOSK_PROFILE", builder)

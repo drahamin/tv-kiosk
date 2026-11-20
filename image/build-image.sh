@@ -84,7 +84,7 @@ if [[ "$KIOSK_VARIANT" == mom ]]; then
   done
 fi
 
-for command in curl losetup mcopy mount openssl python3 sha256sum umount xz; do
+for command in curl losetup mcopy mount openssl python3 sha256sum tar umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
 done
 
@@ -157,7 +157,8 @@ if [[ -n "$CLOUDCONNEXA_PROFILE_FILE" ]]; then
   install -m 0600 "$CLOUDCONNEXA_PROFILE_FILE" "$WORK_DIR/root/etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn"
 fi
 for item in app config scripts session systemd install.sh README.md; do
-  cp -a "$ROOT_DIR/$item" "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
+  tar -C "$ROOT_DIR" --exclude='__pycache__' --exclude='*.py[co]' -cf - "$item" |
+    tar -C "$WORK_DIR/root/opt/tv-kiosk-bootstrap" -xf -
 done
 
 write_wifi_profile() {
