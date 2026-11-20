@@ -48,6 +48,8 @@ class InstallProfileTests(unittest.TestCase):
         builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
         self.assertIn("WIFI_PRIMARY_SSID", builder)
         self.assertIn("WIFI_SECONDARY_SSID", builder)
+        self.assertIn("WIFI_PRIMARY_PSK", builder)
+        self.assertIn("WIFI_SECONDARY_PSK", builder)
         self.assertIn("Rahamin-Home", builder)
         self.assertIn("Rahamin-Baiamonte", builder)
         self.assertIn("KIOSK_PROFILE", builder)
@@ -108,6 +110,24 @@ class InstallProfileTests(unittest.TestCase):
         self.assertIn('config["secondary_display_enabled"] = True', setup)
         self.assertIn('rahamin:*"Raspberry Pi 4"*', setup)
         self.assertIn('rahamin:*"Raspberry Pi 5"*', setup)
+        self.assertIn('mom:*"Raspberry Pi 4"*', setup)
+
+    def test_mom_profile_is_vpn_free_dual_display_with_cloudflare_edges(self):
+        config = json.loads((ROOT / "config" / "kiosk-mom.json").read_text(encoding="utf-8"))
+        installer = (ROOT / "install.sh").read_text(encoding="utf-8")
+        builder = (ROOT / "image" / "build-image.sh").read_text(encoding="utf-8")
+        edge = (ROOT / "scripts" / "rahamin-kiosk-mom-edge").read_text(encoding="utf-8")
+        self.assertEqual(len(config["pages"]), 5)
+        self.assertTrue(config["secondary_display_enabled"])
+        self.assertEqual(config["secondary_display_url"], "http://127.0.0.1:18101")
+        self.assertTrue(all(page["url"].startswith("http://127.0.0.1:") for page in config["pages"]))
+        self.assertIn("mom-dual-display-pi4.img", builder)
+        self.assertIn("The Mom image is VPN-free", builder)
+        self.assertIn("config/kiosk-mom.json", installer)
+        self.assertIn("CF-Access-Client-Id", edge)
+        self.assertIn("CF-Access-Client-Secret", edge)
+        for port in (18101, 18998, 18999, 18199):
+            self.assertIn(str(port), edge)
 
     def test_firstboot_explicitly_tries_both_wifi_profiles_without_wizard(self):
         firstboot = (ROOT / "image" / "tv-kiosk-firstboot").read_text(encoding="utf-8")

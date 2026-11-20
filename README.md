@@ -10,7 +10,7 @@ interval. The default playlist rotates every 45 seconds:
 4. Miami Weather
 5. Sicily Weather
 
-The project produces two flashable image products:
+The project produces three flashable image products:
 
 1. **Baiamonte Kiosk** — one image for both Pi Zero and Pi 3+. It detects the
    board at first boot. Pi Zero uses the lightweight dashboard mode and omits
@@ -20,6 +20,10 @@ The project produces two flashable image products:
 2. **Rahamin Kiosk — Five Page** — a Pi 3+ image with the five enabled ADS-B,
    AIS, airport, Miami weather, and Sicily weather pages listed above. It begins
    rotating immediately at 45-second intervals.
+3. **Mom Dual Display** — a VPN-free Pi 4 image. HDMI 1 rotates the five Miami
+   pages and HDMI 2 shows the internally rotating Baiamonte TV dashboard. Four
+   loopback-only proxies inject a Cloudflare Access service token, so neither
+   the browser nor the destination network needs VPN credentials.
 
 The images share the same Admin page, dual Wi-Fi setup, DHCP Ethernet, key-only
 SSH maintenance, HDMI/CEC handling, recovery supervision, and GitHub updater.
@@ -46,9 +50,10 @@ The local service listens on port `8999` by default and provides:
 
 ## First deployment
 
-Ethernet and the preloaded `Home` and `Baiamonte` Wi-Fi connections use DHCP.
-Both Wi-Fi profiles use the one `WIFI_PSK` supplied privately during the image
-build, and the kiosk automatically joins whichever is available. A new image
+Ethernet and both preloaded Wi-Fi connections use DHCP. Each Wi-Fi profile can
+have its own `WIFI_PRIMARY_PSK` or `WIFI_SECONDARY_PSK`; legacy builds can still
+use one shared `WIFI_PSK`. The kiosk automatically joins whichever is available,
+including hidden SSIDs. A new image
 opens the setup screen on the TV and displays every detected IPv4 address, the
 `.local` address, and the admin URL. No keyboard is required.
 
@@ -187,6 +192,7 @@ and writes:
 
 - `dist/baiamonte-kiosk-universal.img.xz` for Pi Zero or Pi 3+;
 - `dist/rahamin-kiosk-five-page.img.xz` for Pi 3+;
+- `dist/mom-dual-display-pi4.img.xz` for a VPN-free dual-display Pi 4;
 - a matching `.sha256` integrity file for each compressed image.
 
 On first boot, a full-screen
@@ -209,7 +215,8 @@ combination automatically. A typical private
 ```sh
 WIFI_PRIMARY_SSID=Home
 WIFI_SECONDARY_SSID=Baiamonte
-WIFI_PSK=your-shared-password
+WIFI_PRIMARY_PSK=your-primary-password
+WIFI_SECONDARY_PSK=your-secondary-password
 KIOSK_PROFILE=auto
 KIOSK_VARIANT=baiamonte
 BAIAMONTE_TV_URL=http://192.168.0.10:8123
@@ -230,3 +237,21 @@ building. A Cloud ID by itself normally requires an interactive sign-in and is
 not sufficient for a keyboard-free kiosk. The fallback uses split routing, so
 GitHub updates and unrelated web traffic continue through the deployment's
 ordinary Ethernet or Wi-Fi connection.
+
+### Mom dual-display Cloudflare edge
+
+Create four Cloudflare Tunnel published applications and point them at the
+private display services from the connector at each site:
+
+- Baiamonte TV → `http://192.168.0.10:8101`
+- Miami ADS-B → `http://192.168.86.155:8998`
+- Miami airport board → `http://192.168.86.155:8999`
+- Miami AIS/weather → `http://192.168.86.196:8999`
+
+Protect all four hostnames with a Cloudflare Access **Service Auth** policy and
+one service token. Set the resulting HTTPS hostnames and token in the ignored
+`image/config.local.env`, select `KIOSK_VARIANT=mom` and `KIOSK_PROFILE=multi`,
+then run `sudo ./image/build-mom-image.sh`. The credentials are stored root-only
+on the Pi. CloudConnexa is rejected and disabled for this image. Admin remains
+at `http://<pi-address>:8999/admin`, SSH remains key-only as `kiosk`, and the
+normal GitHub update timer remains enabled.

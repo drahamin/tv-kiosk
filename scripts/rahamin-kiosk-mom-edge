@@ -1,0 +1,87 @@
+#!/bin/sh
+# Create loopback-only HTTPS proxies for Mom's VPN-free Cloudflare displays.
+set -eu
+
+ENV_FILE=${KIOSK_MOM_EDGE_ENV:-/etc/tv-kiosk/mom-cloudflare.env}
+OUTPUT=${KIOSK_MOM_NGINX_CONFIG:-/etc/nginx/conf.d/tv-kiosk-mom.conf}
+
+[ -r "$ENV_FILE" ] || { echo "Missing Mom Cloudflare configuration: $ENV_FILE" >&2; exit 1; }
+
+python3 - "$ENV_FILE" "$OUTPUT" <<'PY'
+import os
+import re
+import shlex
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+source, output = map(Path, sys.argv[1:])
+values = {}
+for raw in source.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    parsed = shlex.split(value, posix=True)
+    values[key.strip()] = parsed[0] if parsed else ""
+
+routes = (
+    ("MOM_BAIAMONTE_ORIGIN", 18101),
+    ("MOM_MIAMI_ADSB_ORIGIN", 18998),
+    ("MOM_MIAMI_AIRPORT_ORIGIN", 18999),
+    ("MOM_MIAMI_AIS_ORIGIN", 18199),
+)
+token_id = values.get("CLOUDFLARE_ACCESS_CLIENT_ID", "")
+token_secret = values.get("CLOUDFLARE_ACCESS_CLIENT_SECRET", "")
+safe_token = re.compile(r"^[A-Za-z0-9._-]{8,256}$")
+if not safe_token.fullmatch(token_id) or not safe_token.fullmatch(token_secret):
+    raise SystemExit("Cloudflare Access service-token credentials are missing or invalid")
+
+servers = []
+for key, port in routes:
+    origin = values.get(key, "")
+    parsed = urlparse(origin)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise SystemExit(f"{key} must be an HTTPS origin without embedded credentials")
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        raise SystemExit(f"{key} must contain only scheme and hostname")
+    if parsed.hostname in {"localhost", "127.0.0.1", "::1"} or parsed.hostname.endswith(".local"):
+        raise SystemExit(f"{key} must be a public Cloudflare hostname")
+    upstream = f"https://{parsed.hostname}" + (f":{parsed.port}" if parsed.port else "")
+    servers.append(f"""
+server {{
+    listen 127.0.0.1:{port};
+    server_name _;
+    location / {{
+        proxy_pass {upstream};
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_ssl_name {parsed.hostname};
+        proxy_set_header Host {parsed.hostname};
+        proxy_set_header CF-Access-Client-Id \"{token_id}\";
+        proxy_set_header CF-Access-Client-Secret \"{token_secret}\";
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 90s;
+        proxy_redirect https://{parsed.hostname}/ http://127.0.0.1:{port}/;
+    }}
+}}
+""")
+
+config = """map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+""" + "".join(servers)
+output.parent.mkdir(parents=True, exist_ok=True)
+temporary = output.with_suffix(output.suffix + ".new")
+temporary.write_text(config, encoding="utf-8")
+os.chmod(temporary, 0o600)
+os.replace(temporary, output)
+PY
+
+rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl enable nginx.service >/dev/null
+systemctl restart nginx.service

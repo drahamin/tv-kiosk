@@ -14,9 +14,21 @@ KIOSK_UPDATE_BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 KIOSK_PROFILE=${KIOSK_PROFILE:-auto}
 KIOSK_VARIANT=${KIOSK_VARIANT:-auto}
 BAIAMONTE_TV_URL=${BAIAMONTE_TV_URL:-http://192.168.0.10:8123}
+MOM_EDGE_ENV=${MOM_EDGE_ENV:-/etc/tv-kiosk/mom-cloudflare.env}
+if [ -r "$MOM_EDGE_ENV" ]; then
+  . "$MOM_EDGE_ENV"
+fi
+MOM_BAIAMONTE_ORIGIN=${MOM_BAIAMONTE_ORIGIN:-}
+MOM_MIAMI_ADSB_ORIGIN=${MOM_MIAMI_ADSB_ORIGIN:-}
+MOM_MIAMI_AIRPORT_ORIGIN=${MOM_MIAMI_AIRPORT_ORIGIN:-}
+MOM_MIAMI_AIS_ORIGIN=${MOM_MIAMI_AIS_ORIGIN:-}
+CLOUDFLARE_ACCESS_CLIENT_ID=${CLOUDFLARE_ACCESS_CLIENT_ID:-}
+CLOUDFLARE_ACCESS_CLIENT_SECRET=${CLOUDFLARE_ACCESS_CLIENT_SECRET:-}
 WIFI_PRIMARY_SSID=${WIFI_PRIMARY_SSID:-Home}
 WIFI_SECONDARY_SSID=${WIFI_SECONDARY_SSID:-Baiamonte}
 WIFI_PSK=${WIFI_PSK:-}
+WIFI_PRIMARY_PSK=${WIFI_PRIMARY_PSK:-$WIFI_PSK}
+WIFI_SECONDARY_PSK=${WIFI_SECONDARY_PSK:-$WIFI_PSK}
 CLOUDCONNEXA_PROFILE_FILE=${CLOUDCONNEXA_PROFILE_FILE:-}
 
 HARDWARE_MODEL=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || printf 'Raspberry Pi')
@@ -29,15 +41,22 @@ case "$KIOSK_VARIANT" in
       INSTALL_VARIANT=rahamin
     fi
     ;;
-  baiamonte|rahamin) INSTALL_VARIANT=$KIOSK_VARIANT ;;
+  baiamonte|rahamin|mom) INSTALL_VARIANT=$KIOSK_VARIANT ;;
   *)
-    echo "KIOSK_VARIANT must be auto, baiamonte, or rahamin" >&2
+    echo "KIOSK_VARIANT must be auto, baiamonte, rahamin, or mom" >&2
     exit 1
     ;;
 esac
-if [ "$INSTALL_VARIANT" = rahamin ] && [ "$HARDWARE_PROFILE" = zero ]; then
-  echo "The Rahamin five-page kiosk requires a Raspberry Pi 3 or newer." >&2
+if { [ "$INSTALL_VARIANT" = rahamin ] || [ "$INSTALL_VARIANT" = mom ]; } && [ "$HARDWARE_PROFILE" = zero ]; then
+  echo "The Rahamin and Mom dual-display kiosks require a Raspberry Pi 3 or newer." >&2
   exit 1
+fi
+if [ "$INSTALL_VARIANT" = mom ]; then
+  [ -z "$CLOUDCONNEXA_PROFILE_FILE" ] || { echo "The Mom kiosk is VPN-free; do not provide CLOUDCONNEXA_PROFILE_FILE" >&2; exit 1; }
+  for required in MOM_BAIAMONTE_ORIGIN MOM_MIAMI_ADSB_ORIGIN MOM_MIAMI_AIRPORT_ORIGIN MOM_MIAMI_AIS_ORIGIN CLOUDFLARE_ACCESS_CLIENT_ID CLOUDFLARE_ACCESS_CLIENT_SECRET; do
+    eval "value=\${$required:-}"
+    [ -n "$value" ] || { echo "The Mom kiosk requires $required" >&2; exit 1; }
+  done
 fi
 echo "Installing $INSTALL_VARIANT kiosk on $HARDWARE_MODEL ($HARDWARE_PROFILE profile)"
 
@@ -50,6 +69,9 @@ if [ "$HARDWARE_PROFILE" = zero ]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cog zram-tools
 else
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium
+fi
+if [ "$INSTALL_VARIANT" = mom ]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nginx-light
 fi
 
 if ! id "$KIOSK_USER" >/dev/null 2>&1; then
@@ -72,11 +94,32 @@ if [ "$SOURCE_DIR" != "$APP_DIR" ]; then
 fi
 
 chown -R root:root "$APP_DIR"
-chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/detect-hardware-profile" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio" "$APP_DIR/scripts/rahamin-kiosk-chime" "$APP_DIR/scripts/rahamin-kiosk-cloudconnexa"
+chmod +x "$APP_DIR/app/server.py" "$APP_DIR/scripts/update-kiosk.sh" "$APP_DIR/scripts/launch-browser.sh" "$APP_DIR/scripts/browser-controller.py" "$APP_DIR/scripts/startup-chime.py" "$APP_DIR/scripts/apply-system-config.sh" "$APP_DIR/scripts/detect-hardware-profile" "$APP_DIR/scripts/rahamin-kiosk-network" "$APP_DIR/scripts/rahamin-kiosk-cleanup" "$APP_DIR/scripts/rahamin-kiosk-action" "$APP_DIR/scripts/rahamin-kiosk-remote" "$APP_DIR/scripts/rahamin-kiosk-audio" "$APP_DIR/scripts/rahamin-kiosk-chime" "$APP_DIR/scripts/rahamin-kiosk-cloudconnexa" "$APP_DIR/scripts/rahamin-kiosk-mom-edge"
 
 mkdir -p /etc/tv-kiosk /etc/lightdm/lightdm.conf.d "/home/$KIOSK_USER/.config/openbox" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/tv-kiosk"
 if [ -n "$CLOUDCONNEXA_PROFILE_FILE" ]; then
   install -m 0600 "$CLOUDCONNEXA_PROFILE_FILE" /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn
+fi
+if [ "$INSTALL_VARIANT" = mom ]; then
+  umask 077
+  python3 - "$MOM_EDGE_ENV" "$MOM_BAIAMONTE_ORIGIN" "$MOM_MIAMI_ADSB_ORIGIN" "$MOM_MIAMI_AIRPORT_ORIGIN" "$MOM_MIAMI_AIS_ORIGIN" "$CLOUDFLARE_ACCESS_CLIENT_ID" "$CLOUDFLARE_ACCESS_CLIENT_SECRET" <<'PY'
+import shlex
+import sys
+from pathlib import Path
+
+keys = (
+    "MOM_BAIAMONTE_ORIGIN",
+    "MOM_MIAMI_ADSB_ORIGIN",
+    "MOM_MIAMI_AIRPORT_ORIGIN",
+    "MOM_MIAMI_AIS_ORIGIN",
+    "CLOUDFLARE_ACCESS_CLIENT_ID",
+    "CLOUDFLARE_ACCESS_CLIENT_SECRET",
+)
+target = Path(sys.argv[1])
+target.write_text("".join(f"{key}={shlex.quote(value)}\n" for key, value in zip(keys, sys.argv[2:])), encoding="utf-8")
+PY
+  chmod 0600 "$MOM_EDGE_ENV"
+  rm -f /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn
 fi
 cat > /etc/tv-kiosk/kiosk.env <<EOF
 KIOSK_PORT=$KIOSK_PORT
@@ -115,9 +158,14 @@ with open(target, "w", encoding="utf-8") as handle:
     json.dump(config, handle, indent=2)
     handle.write("\n")
 PY
+  elif [ "$INSTALL_VARIANT" = mom ]; then
+    cp "$APP_DIR/config/kiosk-mom.json" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
   else
     cp "$APP_DIR/config/kiosk.json" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
   fi
+fi
+if [ "$INSTALL_VARIANT" = mom ]; then
+  "$APP_DIR/scripts/rahamin-kiosk-mom-edge"
 fi
 chown -R "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER"
 chmod +x "/home/$KIOSK_USER/.config/openbox/autostart"
@@ -125,13 +173,21 @@ chmod +x "/home/$KIOSK_USER/.config/labwc/autostart"
 
 # Direct installs can preload the same two roaming Wi-Fi choices as the image.
 # Existing image profiles are updated in place, while Ethernet remains DHCP.
-if [ -n "$WIFI_PSK" ]; then
-  for wifi_spec in "$WIFI_PRIMARY_SSID:20" "$WIFI_SECONDARY_SSID:10"; do
-    wifi_ssid=${wifi_spec%:*}
-    wifi_priority=${wifi_spec##*:}
+if [ -n "$WIFI_PRIMARY_PSK" ] || [ -n "$WIFI_SECONDARY_PSK" ]; then
+  for wifi_slot in primary secondary; do
+    if [ "$wifi_slot" = primary ]; then
+      wifi_ssid=$WIFI_PRIMARY_SSID
+      wifi_password=$WIFI_PRIMARY_PSK
+      wifi_priority=20
+    else
+      wifi_ssid=$WIFI_SECONDARY_SSID
+      wifi_password=$WIFI_SECONDARY_PSK
+      wifi_priority=10
+    fi
+    [ -n "$wifi_ssid" ] && [ -n "$wifi_password" ] || continue
     wifi_name="Rahamin WiFi $wifi_ssid"
     nmcli connection show "$wifi_name" >/dev/null 2>&1 || nmcli connection add type wifi ifname wlan0 con-name "$wifi_name" ssid "$wifi_ssid"
-    nmcli connection modify "$wifi_name" connection.autoconnect yes connection.autoconnect-priority "$wifi_priority" connection.autoconnect-retries 0 802-11-wireless.band bg 802-11-wireless.hidden yes 802-11-wireless.powersave 2 ipv4.method auto ipv6.method auto wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PSK"
+    nmcli connection modify "$wifi_name" connection.autoconnect yes connection.autoconnect-priority "$wifi_priority" connection.autoconnect-retries 0 802-11-wireless.band bg 802-11-wireless.hidden yes 802-11-wireless.powersave 2 ipv4.method auto ipv6.method auto wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$wifi_password"
   done
 fi
 

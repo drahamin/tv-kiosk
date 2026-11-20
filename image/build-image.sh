@@ -20,7 +20,11 @@ fi
 
 : "${WIFI_PRIMARY_SSID:=${WIFI_SSID:-Home}}"
 : "${WIFI_SECONDARY_SSID:=Baiamonte}"
-: "${WIFI_PSK:?Set WIFI_PSK in image/config.local.env}"
+: "${WIFI_PSK:=}"
+: "${WIFI_PRIMARY_PSK:=${WIFI_PSK:-}}"
+: "${WIFI_SECONDARY_PSK:=${WIFI_PSK:-}}"
+: "${WIFI_PRIMARY_PSK:?Set WIFI_PRIMARY_PSK (or WIFI_PSK) in image/config.local.env}"
+: "${WIFI_SECONDARY_PSK:?Set WIFI_SECONDARY_PSK (or WIFI_PSK) in image/config.local.env}"
 : "${WIFI_COUNTRY:=US}"
 : "${KIOSK_PORT:=8999}"
 : "${KIOSK_UPDATE_BRANCH:=main}"
@@ -31,6 +35,12 @@ fi
 : "${RPI_OS_IMAGE_URL:=}"
 : "${SSH_PUBLIC_KEY_FILE:=$ROOT_DIR/image/kiosk_admin_ed25519.pub}"
 : "${CLOUDCONNEXA_PROFILE_FILE:=}"
+: "${MOM_BAIAMONTE_ORIGIN:=}"
+: "${MOM_MIAMI_ADSB_ORIGIN:=}"
+: "${MOM_MIAMI_AIRPORT_ORIGIN:=}"
+: "${MOM_MIAMI_AIS_ORIGIN:=}"
+: "${CLOUDFLARE_ACCESS_CLIENT_ID:=}"
+: "${CLOUDFLARE_ACCESS_CLIENT_SECRET:=}"
 
 if [[ "$SSH_PUBLIC_KEY_FILE" != /* ]]; then
   SSH_PUBLIC_KEY_FILE="$ROOT_DIR/$SSH_PUBLIC_KEY_FILE"
@@ -42,10 +52,17 @@ if [[ -n "$CLOUDCONNEXA_PROFILE_FILE" ]]; then
 fi
 [[ "$WIFI_COUNTRY" =~ ^[A-Z]{2}$ ]] || { echo "WIFI_COUNTRY must be a two-letter uppercase country code" >&2; exit 1; }
 [[ "$KIOSK_PROFILE" =~ ^(auto|zero|multi)$ ]] || { echo "KIOSK_PROFILE must be auto, zero, or multi" >&2; exit 1; }
-[[ "$KIOSK_VARIANT" =~ ^(auto|baiamonte|rahamin)$ ]] || { echo "KIOSK_VARIANT must be auto, baiamonte, or rahamin" >&2; exit 1; }
+[[ "$KIOSK_VARIANT" =~ ^(auto|baiamonte|rahamin|mom)$ ]] || { echo "KIOSK_VARIANT must be auto, baiamonte, rahamin, or mom" >&2; exit 1; }
 if [[ "$KIOSK_VARIANT" == rahamin && "$KIOSK_PROFILE" == zero ]]; then
   echo "The Rahamin five-page image requires KIOSK_PROFILE=multi or auto." >&2
   exit 1
+fi
+if [[ "$KIOSK_VARIANT" == mom ]]; then
+  [[ "$KIOSK_PROFILE" == multi ]] || { echo "The Mom image requires KIOSK_PROFILE=multi" >&2; exit 1; }
+  [[ -z "$CLOUDCONNEXA_PROFILE_FILE" ]] || { echo "The Mom image is VPN-free and cannot embed CloudConnexa" >&2; exit 1; }
+  for required in MOM_BAIAMONTE_ORIGIN MOM_MIAMI_ADSB_ORIGIN MOM_MIAMI_AIRPORT_ORIGIN MOM_MIAMI_AIS_ORIGIN CLOUDFLARE_ACCESS_CLIENT_ID CLOUDFLARE_ACCESS_CLIENT_SECRET; do
+    [[ -n "${!required}" ]] || { echo "The Mom image requires $required" >&2; exit 1; }
+  done
 fi
 
 for command in curl losetup mcopy mount openssl sha256sum umount xz; do
@@ -76,6 +93,7 @@ BASE_IMAGE="$WORK_DIR/os.img"
 case "$KIOSK_VARIANT" in
   baiamonte) OUTPUT_IMAGE="$DIST_DIR/baiamonte-kiosk-universal.img" ;;
   rahamin) OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-five-page.img" ;;
+  mom) OUTPUT_IMAGE="$DIST_DIR/mom-dual-display-pi4.img" ;;
   *) OUTPUT_IMAGE="$DIST_DIR/rahamin-kiosk-universal.img" ;;
 esac
 cp "$BASE_IMAGE" "$OUTPUT_IMAGE"
@@ -123,10 +141,10 @@ for item in app config scripts session systemd install.sh README.md; do
   cp -a "$ROOT_DIR/$item" "$WORK_DIR/root/opt/tv-kiosk-bootstrap/"
 done
 
-escaped_psk=${WIFI_PSK//\"/\\\"}
 write_wifi_profile() {
-  local ssid=$1 filename=$2 priority=$3
+  local ssid=$1 psk=$2 filename=$3 priority=$4
   local escaped_ssid=${ssid//\"/\\\"}
+  local escaped_psk=${psk//\"/\\\"}
   cat > "$WORK_DIR/root/etc/NetworkManager/system-connections/$filename.nmconnection" <<EOF
 [connection]
 id=Rahamin WiFi $escaped_ssid
@@ -155,9 +173,9 @@ EOF
   chmod 600 "$WORK_DIR/root/etc/NetworkManager/system-connections/$filename.nmconnection"
 }
 
-write_wifi_profile "$WIFI_PRIMARY_SSID" Rahamin-Home 20
+write_wifi_profile "$WIFI_PRIMARY_SSID" "$WIFI_PRIMARY_PSK" Rahamin-Home 20
 if [[ "$WIFI_SECONDARY_SSID" != "$WIFI_PRIMARY_SSID" ]]; then
-  write_wifi_profile "$WIFI_SECONDARY_SSID" Rahamin-Baiamonte 10
+  write_wifi_profile "$WIFI_SECONDARY_SSID" "$WIFI_SECONDARY_PSK" Rahamin-Baiamonte 10
 fi
 
 cat > "$WORK_DIR/root/etc/NetworkManager/system-connections/Rahamin-Ethernet.nmconnection" <<EOF
@@ -209,6 +227,12 @@ install -m 0644 "$ROOT_DIR/image/tv-kiosk-firstboot.service" "$WORK_DIR/root/etc
   printf 'KIOSK_PROFILE=%q\n' "$KIOSK_PROFILE"
   printf 'KIOSK_VARIANT=%q\n' "$KIOSK_VARIANT"
   printf 'BAIAMONTE_TV_URL=%q\n' "$BAIAMONTE_TV_URL"
+  printf 'MOM_BAIAMONTE_ORIGIN=%q\n' "$MOM_BAIAMONTE_ORIGIN"
+  printf 'MOM_MIAMI_ADSB_ORIGIN=%q\n' "$MOM_MIAMI_ADSB_ORIGIN"
+  printf 'MOM_MIAMI_AIRPORT_ORIGIN=%q\n' "$MOM_MIAMI_AIRPORT_ORIGIN"
+  printf 'MOM_MIAMI_AIS_ORIGIN=%q\n' "$MOM_MIAMI_AIS_ORIGIN"
+  printf 'CLOUDFLARE_ACCESS_CLIENT_ID=%q\n' "$CLOUDFLARE_ACCESS_CLIENT_ID"
+  printf 'CLOUDFLARE_ACCESS_CLIENT_SECRET=%q\n' "$CLOUDFLARE_ACCESS_CLIENT_SECRET"
 } > "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 chmod 600 "$WORK_DIR/root/etc/tv-kiosk/bootstrap.env"
 ln -sf ../tv-kiosk-firstboot.service "$WORK_DIR/root/etc/systemd/system/multi-user.target.wants/tv-kiosk-firstboot.service"

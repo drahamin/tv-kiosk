@@ -1,0 +1,43 @@
+{
+  "title": "Mom Dual Display Kiosk",
+  "listen_port": 8999,
+  "rotation_seconds": 45,
+  "transition_seconds": 0.7,
+  "zoom_percent": 100,
+  "audio_enabled": true,
+  "audio_volume": 60,
+  "secondary_display_enabled": true,
+  "secondary_display_url": "http://127.0.0.1:18101",
+  "secondary_zoom_percent": 100,
+  "show_status": true,
+  "background": "#080706",
+  "theme": "rahamin",
+  "setup_complete": true,
+  "pages": [
+    {
+      "name": "Rahamin ADS-B TV",
+      "url": "http://127.0.0.1:18998/tv",
+      "enabled": true
+    },
+    {
+      "name": "Rahamin AIS TV",
+      "url": "http://127.0.0.1:18199/tv?area=miami",
+      "enabled": true
+    },
+    {
+      "name": "Airport / Samsung TV Board",
+      "url": "http://127.0.0.1:18999/tv",
+      "enabled": true
+    },
+    {
+      "name": "Miami Weather",
+      "url": "http://127.0.0.1:18199/miami",
+      "enabled": true
+    },
+    {
+      "name": "Sicily Weather",
+      "url": "http://127.0.0.1:18199/sicily",
+      "enabled": true
+    }
+  ]
+}

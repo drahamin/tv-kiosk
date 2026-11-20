@@ -27,7 +27,7 @@ HARDWARE_MODEL=${HARDWARE_MODEL:-$(tr -d '\000' < /proc/device-tree/model 2>/dev
 DUAL_HDMI_DEFAULT_MARKER="$STATE_DIR/dual-hdmi-default-v1"
 KIOSK_CONFIG="/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
 case "${KIOSK_VARIANT:-auto}:$HARDWARE_MODEL" in
-  rahamin:*"Raspberry Pi 4"*|rahamin:*"Raspberry Pi 5"*)
+  rahamin:*"Raspberry Pi 4"*|rahamin:*"Raspberry Pi 5"*|mom:*"Raspberry Pi 4"*|mom:*"Raspberry Pi 5"*)
     if [ ! -e "$DUAL_HDMI_DEFAULT_MARKER" ] && [ -f "$KIOSK_CONFIG" ]; then
       python3 - "$KIOSK_CONFIG" <<'PY'
 import json
@@ -155,7 +155,7 @@ fi
 # real HPD/EDID returns.
 BOOT_CMDLINE=/boot/firmware/cmdline.txt
 [ -f "$BOOT_CMDLINE" ] || BOOT_CMDLINE=/boot/cmdline.txt
-if [ "${KIOSK_VARIANT:-auto}" != rahamin ]; then
+if [ "${KIOSK_VARIANT:-auto}" != rahamin ] && [ "${KIOSK_VARIANT:-auto}" != mom ]; then
   BOOT_CMDLINE=
 elif [ -f "$BOOT_CMDLINE" ]; then
   case "$HARDWARE_MODEL" in
@@ -178,14 +178,18 @@ PY
 fi
 
 BROWSER_PACKAGE=
+MOM_PACKAGE=
 if [ "$KIOSK_HARDWARE_PROFILE" = zero ] && ! command -v cog >/dev/null 2>&1; then
   BROWSER_PACKAGE=cog
 elif [ "$KIOSK_HARDWARE_PROFILE" != zero ] && ! command -v chromium >/dev/null 2>&1; then
   BROWSER_PACKAGE=chromium
 fi
-if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || ! command -v wlr-randr >/dev/null 2>&1 || ! command -v xdotool >/dev/null 2>&1 || ! command -v openvpn >/dev/null 2>&1 || ! dpkg-query -W -f='${Status}' network-manager-openvpn 2>/dev/null | grep -q 'install ok installed' || [ -n "$BROWSER_PACKAGE" ]; then
+if [ "${KIOSK_VARIANT:-auto}" = mom ] && ! command -v nginx >/dev/null 2>&1; then
+  MOM_PACKAGE=nginx-light
+fi
+if ! command -v cec-client >/dev/null 2>&1 || ! command -v wtype >/dev/null 2>&1 || ! command -v labwc >/dev/null 2>&1 || ! command -v wlr-randr >/dev/null 2>&1 || ! command -v xdotool >/dev/null 2>&1 || ! command -v openvpn >/dev/null 2>&1 || ! dpkg-query -W -f='${Status}' network-manager-openvpn 2>/dev/null | grep -q 'install ok installed' || [ -n "$BROWSER_PACKAGE" ] || [ -n "$MOM_PACKAGE" ]; then
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc network-manager-openvpn openvpn wlr-randr wtype xdotool $BROWSER_PACKAGE
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cec-utils labwc network-manager-openvpn openvpn wlr-randr wtype xdotool $BROWSER_PACKAGE $MOM_PACKAGE
 fi
 
 # Pi Zero requires 2.4 GHz. Pi 4/5 kiosks prefer the less congested 5 GHz
@@ -196,7 +200,7 @@ case "$HARDWARE_MODEL" in
   *"Raspberry Pi 4"*|*"Raspberry Pi 5"*) WIFI_BAND=a ;;
   *) WIFI_BAND= ;;
 esac
-for WIFI_CONNECTION in "Rahamin WiFi Home" "Rahamin WiFi Baiamonte"; do
+for WIFI_CONNECTION in "Rahamin WiFi Home" "Rahamin WiFi Baiamonte" "Rahamin WiFi Charnock Home"; do
   if nmcli connection show "$WIFI_CONNECTION" >/dev/null 2>&1; then
     nmcli connection modify "$WIFI_CONNECTION" 802-11-wireless.band "$WIFI_BAND" || true
   fi
@@ -233,6 +237,7 @@ install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cleanup" /usr/local/sbin/rahamin
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action" /usr/local/sbin/rahamin-kiosk-action
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-action-request" /usr/local/sbin/rahamin-kiosk-action-request
 install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-cloudconnexa" /usr/local/sbin/rahamin-kiosk-cloudconnexa
+install -m 0755 "$APP_DIR/scripts/rahamin-kiosk-mom-edge" /usr/local/sbin/rahamin-kiosk-mom-edge
 rm -f /etc/sudoers.d/90-rahamin-kiosk-network /etc/sudoers.d/91-rahamin-kiosk-action
 
 for unit in tv-kiosk-web.service tv-kiosk-update.service tv-kiosk-update.timer tv-kiosk-action.service tv-kiosk-action.path tv-kiosk-network.service tv-kiosk-network.path tv-kiosk-cloudconnexa.service; do
@@ -240,7 +245,11 @@ for unit in tv-kiosk-web.service tv-kiosk-update.service tv-kiosk-update.timer t
 done
 systemctl daemon-reload
 systemctl enable --now tv-kiosk-update.timer tv-kiosk-action.path tv-kiosk-network.path >/dev/null
-if [ -s /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn ]; then
+if [ "${KIOSK_VARIANT:-auto}" = mom ]; then
+  systemctl disable --now tv-kiosk-cloudconnexa.service >/dev/null 2>&1 || true
+  rm -f /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn
+  /usr/local/sbin/rahamin-kiosk-mom-edge
+elif [ -s /etc/tv-kiosk/cloudconnexa-baiamonte-dashboard.ovpn ]; then
   systemctl enable --now tv-kiosk-cloudconnexa.service >/dev/null
 else
   systemctl disable --now tv-kiosk-cloudconnexa.service >/dev/null 2>&1 || true
