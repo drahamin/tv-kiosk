@@ -251,7 +251,9 @@ private display services from the connector at each site:
 Protect all four hostnames with a Cloudflare Access **Service Auth** policy and
 one service token. Set the resulting HTTPS hostnames and token in the ignored
 `image/config.local.env`, select `KIOSK_VARIANT=mom` and `KIOSK_PROFILE=multi`,
-then run `sudo ./image/build-mom-image.sh`. The credentials are stored root-only
+then run `sudo ./image/build-mom-image.sh`. The token may instead be supplied
+through `MOM_ACCESS_CREDENTIALS_FILE`, pointing to a private JSON file with
+`client_id` and `client_secret`. The credentials are stored root-only
 on the Pi. CloudConnexa is rejected and disabled for this image. Admin remains
 at `http://<pi-address>:8999/admin`, SSH remains key-only as `kiosk`, and the
 normal GitHub update timer remains enabled.

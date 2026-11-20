@@ -41,6 +41,25 @@ fi
 : "${MOM_MIAMI_AIS_ORIGIN:=}"
 : "${CLOUDFLARE_ACCESS_CLIENT_ID:=}"
 : "${CLOUDFLARE_ACCESS_CLIENT_SECRET:=}"
+: "${MOM_ACCESS_CREDENTIALS_FILE:=}"
+
+if [[ -n "$MOM_ACCESS_CREDENTIALS_FILE" ]]; then
+  [[ "$MOM_ACCESS_CREDENTIALS_FILE" == /* ]] || MOM_ACCESS_CREDENTIALS_FILE="$ROOT_DIR/$MOM_ACCESS_CREDENTIALS_FILE"
+  [[ -s "$MOM_ACCESS_CREDENTIALS_FILE" ]] || { echo "Missing Mom Access credentials: $MOM_ACCESS_CREDENTIALS_FILE" >&2; exit 1; }
+  command -v python3 >/dev/null || { echo "Missing required command: python3" >&2; exit 1; }
+  mapfile -t MOM_ACCESS_VALUES < <(python3 - "$MOM_ACCESS_CREDENTIALS_FILE" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    credentials = json.load(handle)
+print(credentials.get("client_id", ""))
+print(credentials.get("client_secret", ""))
+PY
+  )
+  : "${CLOUDFLARE_ACCESS_CLIENT_ID:=${MOM_ACCESS_VALUES[0]:-}}"
+  : "${CLOUDFLARE_ACCESS_CLIENT_SECRET:=${MOM_ACCESS_VALUES[1]:-}}"
+fi
 
 if [[ "$SSH_PUBLIC_KEY_FILE" != /* ]]; then
   SSH_PUBLIC_KEY_FILE="$ROOT_DIR/$SSH_PUBLIC_KEY_FILE"
@@ -65,7 +84,7 @@ if [[ "$KIOSK_VARIANT" == mom ]]; then
   done
 fi
 
-for command in curl losetup mcopy mount openssl sha256sum umount xz; do
+for command in curl losetup mcopy mount openssl python3 sha256sum umount xz; do
   command -v "$command" >/dev/null || { echo "Missing required command: $command" >&2; exit 1; }
 done
 

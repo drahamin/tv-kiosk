@@ -32,6 +32,12 @@ class KioskServerTests(unittest.TestCase):
         self.assertEqual(len(default["pages"]), 1)
         self.assertEqual(default["pages"][0]["name"], "Baiamonte TV Dashboard")
 
+    def test_mom_variant_uses_dual_display_default(self):
+        self.assertEqual(self.module.default_config_name("mom", "multi"), "kiosk-mom.json")
+        default = json.loads((MODULE_PATH.parents[1] / "config" / "kiosk-mom.json").read_text(encoding="utf-8"))
+        self.assertTrue(default["secondary_display_enabled"])
+        self.assertEqual(len([page for page in default["pages"] if page["enabled"]]), 5)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         config = {
