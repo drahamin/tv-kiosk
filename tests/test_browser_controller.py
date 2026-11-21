@@ -135,6 +135,24 @@ class BrowserControllerTests(unittest.TestCase):
                 config = controller.load_config()
         self.assertEqual(config["pages"], [{"name": "Baiamonte", "url": "https://cloud.example/tv"}])
 
+    def test_existing_stock_baiamonte_image_uses_remote_enabled_display(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "kiosk.json"
+            path.write_text(json.dumps({"pages": [
+                {"name": "Baiamonte TV Dashboard — All Pages", "url": "http://192.168.0.10:8123/"},
+                {"name": "Custom HA dashboard", "url": "http://192.168.0.10:8123/lovelace"},
+            ]}), encoding="utf-8")
+            with (
+                patch.object(controller, "CONFIG_PATH", path),
+                patch.object(controller, "KIOSK_VARIANT", "baiamonte"),
+                patch.object(controller, "HARDWARE_PROFILE", "multi"),
+            ):
+                urls = [page["url"] for page in controller.load_config()["pages"]]
+        self.assertEqual(urls, [
+            "http://192.168.0.10:8101/tv?device=vineyard-kiosk",
+            "http://192.168.0.10:8123/lovelace",
+        ])
+
     def test_baiamonte_uses_private_hostname_only_while_vpn_is_connected(self):
         with tempfile.TemporaryDirectory() as directory:
             status = Path(directory) / "cloudconnexa.json"
@@ -142,6 +160,10 @@ class BrowserControllerTests(unittest.TestCase):
             with patch.object(controller, "KIOSK_VARIANT", "baiamonte"), patch.object(controller, "CLOUDCONNEXA_STATUS", status):
                 self.assertEqual(
                     controller.resolved_dashboard_url("http://192.168.0.10:8123"),
+                    "http://ha.dashboard.baiamonte:8123",
+                )
+                self.assertEqual(
+                    controller.resolved_dashboard_url(controller.BAIAMONTE_TV_URL),
                     "http://ha.dashboard.baiamonte:8123",
                 )
                 self.assertEqual(
