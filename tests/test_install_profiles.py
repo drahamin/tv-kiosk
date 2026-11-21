@@ -35,7 +35,7 @@ class InstallProfileTests(unittest.TestCase):
         self.assertTrue(config["setup_complete"])
         self.assertEqual(len(config["pages"]), 1)
         self.assertIn("All Pages", config["pages"][0]["name"])
-        self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8101/tv?device=vineyard-kiosk")
+        self.assertEqual(config["pages"][0]["url"], "http://192.168.0.10:8123")
 
     def test_rahamin_default_is_ready_with_five_pages(self):
         config = json.loads((ROOT / "config" / "kiosk.json").read_text(encoding="utf-8"))
