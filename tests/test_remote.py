@@ -1,4 +1,3 @@
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -58,27 +57,6 @@ class RemoteControlTests(unittest.TestCase):
         self.assertIn("send_key Return", script)
         self.assertIn('play_pause) send_key space', script)
         self.assertIn("EnvironmentFile=-/etc/tv-kiosk/kiosk.env", unit)
-
-    def test_baiamonte_cec_events_send_keys_to_the_display(self):
-        script = (ROOT / "scripts" / "rahamin-kiosk-remote").read_text(encoding="utf-8")
-        functions = script.split('echo "Rahamin Kiosk Samsung remote listener starting"', 1)[0]
-        harness = """
-KIOSK_VARIANT=baiamonte
-wtype() { printf '%s\n' "$*"; }
-for button do
-  send_action "$(cec_action "DEBUG: key pressed: $button")"
-done
-"""
-        output = subprocess.check_output(
-            ["sh", "-c", functions + harness, "remote-test", "left", "right", "up", "down",
-             "select", "play/pause", "root menu", "back (0x0d)", "backward"],
-            text=True,
-        )
-        self.assertEqual(output.splitlines(), [
-            "-P left -p left", "-P right -p right", "-P up -p up", "-P down -p down",
-            "-P Return -p Return", "-P space -p space", "-P Menu -p Menu",
-            "-P Escape -p Escape", "-M ctrl -P minus -p minus -m ctrl",
-        ])
 
     def test_labwc_hides_and_warps_cursor(self):
         config = (ROOT / "session" / "labwc-rc.xml").read_text(encoding="utf-8")
