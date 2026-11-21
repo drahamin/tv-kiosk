@@ -15,8 +15,7 @@ The project produces three flashable image products:
 1. **Baiamonte Kiosk** — one image for both Pi Zero and Pi 3+. It detects the
    board at first boot. Pi Zero uses the lightweight dashboard mode and omits
    camera-heavy dashboard sections; Pi 3+ uses Chromium and displays every
-   Baiamonte dashboard section. Both open the VPN-local TV display at
-   `http://192.168.0.10:8123` by default.
+   Baiamonte TV page. Pi 3+ opens the dedicated [Vineyard kiosk display](http://192.168.0.10:8101/tv?device=vineyard-kiosk), and Pi Zero retains its lighter Home Assistant dashboard at `http://192.168.0.10:8123`.
 2. **Rahamin Kiosk — Five Page** — a Pi 3+ image with the five enabled ADS-B,
    AIS, airport, Miami weather, and Sicily weather pages listed above. It begins
    rotating immediately at 45-second intervals.
@@ -30,13 +29,13 @@ SSH maintenance, HDMI/CEC handling, recovery supervision, and GitHub updater.
 Set `BAIAMONTE_TV_URL` during image creation or edit Page 1 in Admin to change
 the Baiamonte dashboard address.
 
-An optional CloudConnexa fallback keeps the local dashboard address unchanged.
+An optional CloudConnexa fallback provides access to Home Assistant when the local display is unreachable.
 The kiosk first tries `192.168.0.10:8123` directly. After three consecutive
 failures it starts the private `baiamonte-dashboard` OpenVPN profile, while
 leaving the tunnel off whenever the dashboard is reachable on the local LAN.
 While connected, the display switches to
 `http://ha.dashboard.baiamonte:8123`; when local access returns, it disconnects
-the tunnel and switches back to `http://192.168.0.10:8123` automatically.
+the tunnel and switches back to the local page automatically.
 The Admin status page reports **Local LAN**, **VPN connected**, or the current
 retry state.
 
@@ -100,7 +99,8 @@ The kiosk listens for the Samsung television remote through Anynet+ (HDMI-CEC),
 with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
 
 - Left/Right change pages and Up/Down zoom the active ADS-B, AIS, or weather map on both Rahamin and Baiamonte displays;
-- OK activates the selected control;
+- OK activates the selected control or opens Baiamonte display controls from the page background;
+- Back/Exit closes Baiamonte controls or returns to Today, when Anynet+ forwards the key;
 - Play/Pause pauses or resumes rotation when the displayed dashboard supports it;
 - Fast-forward and Rewind to zoom in and out;
 - Stop to reset browser zoom to 100%.
@@ -219,7 +219,7 @@ WIFI_PRIMARY_PSK=your-primary-password
 WIFI_SECONDARY_PSK=your-secondary-password
 KIOSK_PROFILE=auto
 KIOSK_VARIANT=baiamonte
-BAIAMONTE_TV_URL=http://192.168.0.10:8123
+BAIAMONTE_TV_URL=
 KIOSK_REPO_URL=https://github.com/OWNER/tv-kiosk.git
 CLOUDCONNEXA_PROFILE_FILE=image/cloudconnexa-baiamonte-dashboard.ovpn
 ```

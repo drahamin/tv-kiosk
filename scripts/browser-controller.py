@@ -27,6 +27,8 @@ KIOSK_VARIANT = os.environ.get("KIOSK_VARIANT", "auto").strip().lower()
 CLOUDCONNEXA_STATUS = Path(os.environ.get("KIOSK_CLOUDCONNEXA_STATUS", "/run/tv-kiosk/cloudconnexa-status.json"))
 BAIAMONTE_LOCAL_HOST = os.environ.get("KIOSK_BAIAMONTE_HOST", "192.168.0.10")
 BAIAMONTE_LOCAL_PORT = int(os.environ.get("KIOSK_BAIAMONTE_PORT", "8123"))
+BAIAMONTE_TV_URL = "http://192.168.0.10:8101/tv?device=vineyard-kiosk"
+LEGACY_BAIAMONTE_TV_URL = "http://192.168.0.10:8123"
 BAIAMONTE_VPN_URL = os.environ.get("KIOSK_BAIAMONTE_VPN_URL", "http://ha.dashboard.baiamonte:8123")
 running = True
 requested_step = 0
@@ -60,6 +62,16 @@ def load_config():
         pages = pages[:1]
     if not 1 <= len(pages) <= 5:
         raise ValueError("Rahamin Kiosk requires one to five enabled pages")
+    if KIOSK_VARIANT == "baiamonte" and HARDWARE_PROFILE != "zero":
+        # Older stock Chromium images stored the HA root as their TV page.
+        # Keep custom URLs and the lighter Pi Zero profile as configured.
+        pages = [
+            {**page, "url": BAIAMONTE_TV_URL}
+            if page["name"] == "Baiamonte TV Dashboard — All Pages"
+            and page["url"].rstrip("/") == LEGACY_BAIAMONTE_TV_URL
+            else page
+            for page in pages
+        ]
     return {
         "rotation_seconds": max(5, int(config.get("rotation_seconds", 45))),
         "zoom_percent": int(config.get("zoom_percent", 100)),
@@ -81,7 +93,7 @@ def cloudconnexa_connected():
 
 
 def resolved_dashboard_url(url):
-    """Swap only the Baiamonte local HA origin for its private VPN origin."""
+    """Keep the existing private HA fallback for the stock Baiamonte TV page."""
     if KIOSK_VARIANT != "baiamonte":
         return url
     try:
@@ -89,7 +101,10 @@ def resolved_dashboard_url(url):
     except ValueError:
         return url
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    if parsed.hostname == BAIAMONTE_LOCAL_HOST and port == BAIAMONTE_LOCAL_PORT and cloudconnexa_connected():
+    uses_private_fallback = url == BAIAMONTE_TV_URL or (
+        parsed.hostname == BAIAMONTE_LOCAL_HOST and port == BAIAMONTE_LOCAL_PORT
+    )
+    if uses_private_fallback and cloudconnexa_connected():
         return BAIAMONTE_VPN_URL
     return url
 

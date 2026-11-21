@@ -13,7 +13,7 @@ KIOSK_PORT=${KIOSK_PORT:-8999}
 KIOSK_UPDATE_BRANCH=${KIOSK_UPDATE_BRANCH:-main}
 KIOSK_PROFILE=${KIOSK_PROFILE:-auto}
 KIOSK_VARIANT=${KIOSK_VARIANT:-auto}
-BAIAMONTE_TV_URL=${BAIAMONTE_TV_URL:-http://192.168.0.10:8123}
+BAIAMONTE_TV_URL=${BAIAMONTE_TV_URL:-}
 MOM_EDGE_ENV=${MOM_EDGE_ENV:-/etc/tv-kiosk/mom-cloudflare.env}
 if [ -r "$MOM_EDGE_ENV" ]; then
   . "$MOM_EDGE_ENV"
@@ -148,7 +148,8 @@ if [ ! -e "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" ]; then
       DEFAULT_CONFIG="$APP_DIR/config/kiosk-baiamonte.json"
     fi
     cp "$DEFAULT_CONFIG" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
-    python3 - "$BAIAMONTE_TV_URL" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" <<'PY'
+    if [ -n "$BAIAMONTE_TV_URL" ]; then
+      python3 - "$BAIAMONTE_TV_URL" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json" <<'PY'
 import json, sys
 url, target = sys.argv[1:]
 with open(target, encoding="utf-8") as handle:
@@ -158,6 +159,7 @@ with open(target, "w", encoding="utf-8") as handle:
     json.dump(config, handle, indent=2)
     handle.write("\n")
 PY
+    fi
   elif [ "$INSTALL_VARIANT" = mom ]; then
     cp "$APP_DIR/config/kiosk-mom.json" "/home/$KIOSK_USER/.config/tv-kiosk/kiosk.json"
   else

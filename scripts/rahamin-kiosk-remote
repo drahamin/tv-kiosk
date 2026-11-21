@@ -48,6 +48,8 @@ cec_action() {
     *"key pressed: down"*) echo down ;;
     *"key pressed: left"*) echo previous_page ;;
     *"key pressed: right"*) echo next_page ;;
+    *"key pressed: root menu"*|*"key pressed: setup menu"*) echo menu ;;
+    *"key pressed: exit"*|*"key pressed: back ("*|*"key pressed: back") echo back ;;
     *"key pressed: select"*|*"key pressed: enter"*) echo select ;;
     *"key pressed: page up"*) echo previous_page ;;
     *"key pressed: page down"*) echo next_page ;;
@@ -60,6 +62,12 @@ cec_action() {
 
 send_action() {
   case "$1" in
+    menu)
+      if [ "$KIOSK_VARIANT" = baiamonte ]; then send_key Menu; fi
+      ;;
+    back)
+      if [ "$KIOSK_VARIANT" = baiamonte ]; then send_key Escape; fi
+      ;;
     up|down) send_key "$1" ;;
     previous_page)
       if [ "$KIOSK_VARIANT" = baiamonte ]; then
