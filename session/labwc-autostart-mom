@@ -1,0 +1,14 @@
+#!/bin/sh
+# Executed by Labwc in the kiosk user's graphical session; never guess DISPLAY.
+# Xwayland is optional at runtime, so a failed import cannot block Miami.
+if [ -n "${DISPLAY:-}" ]; then
+  if [ -n "${XAUTHORITY:-}" ]; then
+    systemctl --user import-environment DISPLAY XAUTHORITY || true
+  else
+    systemctl --user unset-environment XAUTHORITY || true
+    systemctl --user import-environment DISPLAY || true
+  fi
+else
+  systemctl --user unset-environment DISPLAY XAUTHORITY || true
+fi
+exec /bin/sh /opt/tv-kiosk/session/labwc-autostart

@@ -72,6 +72,8 @@ else
 fi
 if [ "$INSTALL_VARIANT" = mom ]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nginx-light
+  KIOSK_APT_UPDATED=1 sh "$SOURCE_DIR/scripts/install-mom-xwayland.sh" "$INSTALL_VARIANT" "$HARDWARE_MODEL" ||
+    echo "Mom XWayland provisioning failed; single-screen Miami will remain available." >&2
 fi
 
 if ! id "$KIOSK_USER" >/dev/null 2>&1; then
