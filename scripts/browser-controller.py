@@ -34,6 +34,8 @@ BOOT_MIN_SECONDS = 4
 PAGE_RETRY_SECONDS = 15
 PAGE_HEALTH_SECONDS = 30
 OFFLINE_RELOAD_SECONDS = 300
+DRM_CONNECTORS = Path("/sys/class/drm")
+MOM_OUTPUTS = ("HDMI-A-1", "HDMI-A-2")
 
 
 def stop(_signum, _frame):
@@ -397,6 +399,95 @@ def configure_dual_outputs(config):
     return [primary, secondary]
 
 
+def mom_physical_hdmi():
+    """Forced KMS modes are not proof that a TV is connected."""
+    found = set()
+    for connector in DRM_CONNECTORS.glob("card*-HDMI-A-*"):
+        name = connector.name.split("-", 1)[1]
+        if name not in MOM_OUTPUTS:
+            continue
+        try:
+            if (connector / "status").read_text().strip() != "connected":
+                continue
+            edid = (connector / "edid").read_bytes()
+        except OSError:
+            continue
+        if len(edid) >= 128 and edid[:8] == bytes.fromhex("00ffffffffffff00") and sum(edid[:128]) % 256 == 0:
+            found.add(name)
+    return found
+
+
+def mom_xwayland_ready():
+    if not os.environ.get("DISPLAY"):
+        return False
+    try:
+        return subprocess.run(
+            ["xdotool", "getdisplaygeometry"], capture_output=True, check=False, timeout=2,
+        ).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def mom_display_plan(config, *, allow_dual=True):
+    """Mirror the proven A1/A2 layout, or keep Miami on the one real output."""
+    if not dual_hdmi_capable():
+        return None, []
+    physical = mom_physical_hdmi()
+    available = {item["name"]: item for item in display_outputs()}
+    connected = [available[name] for name in MOM_OUTPUTS if name in physical and name in available]
+    if not connected:
+        # Don't turn off a running output when detection is inconclusive.
+        return None, []
+    primary_name = connected[0]["name"]
+    dual = (
+        allow_dual and config.get("secondary_display_enabled") and
+        len(connected) == 2 and mom_xwayland_ready()
+    )
+    command = ["wlr-randr", "--output", primary_name, "--on", "--pos", "0,0"]
+    if dual:
+        command += ["--output", connected[1]["name"], "--on", "--pos", f"{connected[0]['width']},0"]
+    else:
+        for name in MOM_OUTPUTS:
+            if name in available and name != primary_name:
+                command += ["--output", name, "--off"]
+    try:
+        applied = subprocess.run(command, capture_output=True, check=False, timeout=8).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        applied = False
+    if dual and not applied:
+        return mom_display_plan(config, allow_dual=False)
+    return primary_name, connected if dual else []
+
+
+def mom_secondary_reachable(url):
+    """Require a successful browser-like request; Access 403 is not healthy."""
+    try:
+        origin = urlparse(url)
+        request = Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (X11; Linux armv8l) AppleWebKit/537.36 Chrome/156.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml",
+        })
+        with urlopen(request, timeout=4) as response:
+            final = urlparse(response.geturl())
+            return 200 <= response.status < 300 and (origin.scheme, origin.netloc) == (final.scheme, final.netloc)
+    except HTTPError as exc:
+        exc.close()
+        return False
+    except (OSError, ValueError):
+        return False
+
+
+def stop_chromium(process):
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=8)
+
+
 def display_size(output_name=None):
     for output in display_outputs():
         if output_name is None or output["name"] == output_name:
@@ -555,37 +646,63 @@ def supervise():
     if HARDWARE_PROFILE == "zero":
         supervise_cog()
         return
+    mom_dual_failed = False
+    secondary_reachable = mom_secondary_reachable if KIOSK_VARIANT == "mom" else page_reachable
     while running:
         launch_config = load_config()
         configure_audio(launch_config)
-        outputs = configure_dual_outputs(launch_config)
+        if KIOSK_VARIANT == "mom":
+            selected, outputs = mom_display_plan(launch_config, allow_dual=not mom_dual_failed)
+        else:
+            outputs = configure_dual_outputs(launch_config)
+            selected = outputs[0]["name"] if outputs else None
         dual = len(outputs) == 2
+        process = None
         secondary_process = None
         secondary_tab_id = None
         secondary_url = resolved_dashboard_url(launch_config.get("secondary_display_url", "http://192.168.0.10:8123"))
         secondary_waiting = False
         if dual:
-            secondary_ready = page_reachable(secondary_url)
-            secondary_boot_url = f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile=multi&variant=baiamonte"
-            secondary_process = launch_chromium(
-                launch_config.get("secondary_zoom_percent", 100),
-                False,
-                role="secondary",
-                url=secondary_url if secondary_ready else secondary_boot_url,
-                output_name=outputs[1]["name"],
-                output_x=outputs[0]["width"],
-                dual=True,
+            try:
+                secondary_ready = secondary_reachable(secondary_url)
+                secondary_boot_url = f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile=multi&variant=baiamonte"
+                secondary_process = launch_chromium(
+                    launch_config.get("secondary_zoom_percent", 100),
+                    False,
+                    role="secondary",
+                    url=secondary_url if secondary_ready else secondary_boot_url,
+                    output_name=outputs[1]["name"],
+                    output_x=outputs[0]["width"],
+                    dual=True,
+                )
+                secondary_waiting = not secondary_ready
+                wait_for_chromium(secondary_process, DEBUG_PORT + 1)
+                time.sleep(0.5)
+                if KIOSK_VARIANT == "mom":
+                    process = launch_chromium(
+                        launch_config["zoom_percent"], launch_config["audio_enabled"],
+                        role="primary", output_name=selected, dual=True,
+                    )
+                    wait_for_chromium(process)
+            except (OSError, subprocess.SubprocessError, RuntimeError):
+                if KIOSK_VARIANT != "mom":
+                    raise
+                print("Mom dual display did not start; retaining Miami in single-screen mode", flush=True)
+                for failed in (process, secondary_process):
+                    stop_chromium(failed)
+                process = secondary_process = None
+                secondary_waiting = False
+                mom_dual_failed = True
+                selected, outputs = mom_display_plan(launch_config, allow_dual=False)
+                dual = False
+        if process is None:
+            process = launch_chromium(
+                launch_config["zoom_percent"],
+                launch_config["audio_enabled"],
+                role="primary",
+                output_name=selected,
+                dual=dual,
             )
-            secondary_waiting = not secondary_ready
-            wait_for_chromium(secondary_process, DEBUG_PORT + 1)
-            time.sleep(0.5)
-        process = launch_chromium(
-            launch_config["zoom_percent"],
-            launch_config["audio_enabled"],
-            role="primary",
-            output_name=outputs[0]["name"] if dual else None,
-            dual=dual,
-        )
         launched_at = time.monotonic()
         tab_id = None
         try:
@@ -609,7 +726,11 @@ def supervise():
                 raw_config = load_config()
                 config = resolved_config(raw_config)
                 if secondary_process is not None and secondary_process.poll() is not None:
-                    print("Baiamonte second display exited; restarting both displays", flush=True)
+                    if KIOSK_VARIANT == "mom":
+                        mom_dual_failed = True
+                        print("Baiamonte display exited; restoring Miami single-screen mode", flush=True)
+                    else:
+                        print("Baiamonte second display exited; restarting both displays", flush=True)
                     break
                 if raw_config["zoom_percent"] != launch_config["zoom_percent"] or raw_config["audio_enabled"] != launch_config["audio_enabled"]:
                     print("Display scale or audio mode changed; restarting Chromium", flush=True)
@@ -617,6 +738,7 @@ def supervise():
                 secondary_settings = ("secondary_display_enabled", "secondary_display_url", "secondary_zoom_percent")
                 if any(raw_config.get(key) != launch_config.get(key) for key in secondary_settings):
                     print("Second HDMI settings changed; rebuilding the display layout", flush=True)
+                    mom_dual_failed = False
                     break
                 new_fingerprint = json.dumps(config, sort_keys=True)
                 if new_fingerprint != fingerprint:
@@ -646,7 +768,7 @@ def supervise():
                     current_page_was_unreachable = not reachable
                     next_page_health_check = now + PAGE_HEALTH_SECONDS
                 if secondary_process is not None and now >= next_secondary_retry:
-                    reachable = page_reachable(secondary_url)
+                    reachable = secondary_reachable(secondary_url)
                     if reachable and (secondary_waiting or secondary_was_unreachable):
                         secondary_tab_id = show_page(secondary_url, secondary_tab_id, port=DEBUG_PORT + 1, preserve_app_window=True)
                         secondary_waiting = False

@@ -228,7 +228,15 @@ if [ ! -e "$STATE_DIR/home-ownership-v1" ]; then
 fi
 
 install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "/home/$KIOSK_USER/.config/labwc" "/home/$KIOSK_USER/.config/openbox"
-install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/labwc-autostart" "/home/$KIOSK_USER/.config/labwc/autostart"
+LABWC_AUTOSTART="$APP_DIR/session/labwc-autostart"
+case "${KIOSK_VARIANT:-auto}:$HARDWARE_MODEL" in
+  mom:*"Raspberry Pi 4"*|mom:*"Raspberry Pi 5"*)
+    LABWC_AUTOSTART="$APP_DIR/session/labwc-autostart-mom"
+    sh "$APP_DIR/scripts/install-mom-xwayland.sh" "$KIOSK_VARIANT" "$HARDWARE_MODEL" ||
+      echo "Mom XWayland provisioning failed; single-screen Miami will remain available." >&2
+    ;;
+esac
+install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$LABWC_AUTOSTART" "/home/$KIOSK_USER/.config/labwc/autostart"
 install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/labwc-rc.xml" "/home/$KIOSK_USER/.config/labwc/rc.xml"
 install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/session/openbox-autostart" "/home/$KIOSK_USER/.config/openbox/autostart"
 
@@ -262,6 +270,17 @@ if ! cmp -s "$APP_DIR/systemd/tv-kiosk-browser.service" "$BROWSER_UNIT"; then
   install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-browser.service" "$BROWSER_UNIT"
   BROWSER_CHANGED=true
 fi
+# kiosk.env may be root-only on Mom because the installer also handles edge
+# credentials. Give the unprivileged browser only the two non-secret fields
+# it needs, rather than changing access to the system environment file.
+case "${KIOSK_VARIANT:-auto}:$HARDWARE_MODEL" in
+  mom:*"Raspberry Pi 4"*|mom:*"Raspberry Pi 5"*)
+    BROWSER_DROPIN="$BROWSER_UNIT.d"
+    install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$BROWSER_DROPIN"
+    [ -f "$BROWSER_DROPIN/50-mom-display.conf" ] || BROWSER_CHANGED=true
+    install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER"       "$APP_DIR/systemd/tv-kiosk-browser-mom.conf" "$BROWSER_DROPIN/50-mom-display.conf"
+    ;;
+esac
 REMOTE_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-remote.service"
 REMOTE_CHANGED=false
 if ! cmp -s "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"; then
