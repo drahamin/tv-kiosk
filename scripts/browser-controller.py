@@ -36,6 +36,8 @@ PAGE_HEALTH_SECONDS = 30
 OFFLINE_RELOAD_SECONDS = 300
 DRM_CONNECTORS = Path("/sys/class/drm")
 MOM_OUTPUTS = ("HDMI-A-1", "HDMI-A-2")
+MOM_HOTPLUG_PROBE_SECONDS = 5
+MOM_DUAL_RETRY_SECONDS = 60
 
 
 def stop(_signum, _frame):
@@ -428,6 +430,46 @@ def mom_xwayland_ready():
         return False
 
 
+
+class MomHotplugRecovery:
+    """Recheck a single-screen fallback without changing any active modes."""
+
+    def __init__(self):
+        self.next_probe = 0
+        self.retry_after = 0
+        self.observed = None
+        self.samples = 0
+        self.attempted = False
+
+    def mark_attempt(self, now):
+        self.attempted = True
+        self.retry_after = now + MOM_DUAL_RETRY_SECONDS
+        self.observed = None
+        self.samples = 0
+
+    def ready(self, now):
+        if now < self.next_probe:
+            return False
+        self.next_probe = now + MOM_HOTPLUG_PROBE_SECONDS
+        physical = frozenset(mom_physical_hdmi())
+        self.samples = self.samples + 1 if physical == self.observed else 1
+        self.observed = physical
+        if self.samples < 2:
+            return False
+
+        # Once an attempt fails, stable HDMI loss/reconnection, not unchanged
+        # EDID or a momentary zero-output read, can arm another attempt.
+        if len(physical) == 1:
+            self.attempted = False
+        if self.attempted or now < self.retry_after or physical != frozenset(MOM_OUTPUTS):
+            return False
+        available = {item["name"] for item in display_outputs()}
+        if not physical.issubset(available) or not mom_xwayland_ready():
+            return False
+        self.mark_attempt(now)
+        return True
+
+
 def mom_display_plan(config, *, allow_dual=True):
     """Mirror the proven A1/A2 layout, or keep Miami on the one real output."""
     if not dual_hdmi_capable():
@@ -647,6 +689,7 @@ def supervise():
         supervise_cog()
         return
     mom_dual_failed = False
+    mom_hotplug = MomHotplugRecovery() if KIOSK_VARIANT == "mom" and dual_hdmi_capable() else None
     secondary_reachable = mom_secondary_reachable if KIOSK_VARIANT == "mom" else page_reachable
     while running:
         launch_config = load_config()
@@ -663,6 +706,8 @@ def supervise():
         secondary_url = resolved_dashboard_url(launch_config.get("secondary_display_url", "http://192.168.0.10:8123"))
         secondary_waiting = False
         if dual:
+            if mom_hotplug is not None:
+                mom_hotplug.mark_attempt(time.monotonic())
             try:
                 secondary_ready = secondary_reachable(secondary_url)
                 secondary_boot_url = f"{(ROOT / 'session' / 'boot.html').as_uri()}?profile=multi&variant=baiamonte"
@@ -738,6 +783,16 @@ def supervise():
                 secondary_settings = ("secondary_display_enabled", "secondary_display_url", "secondary_zoom_percent")
                 if any(raw_config.get(key) != launch_config.get(key) for key in secondary_settings):
                     print("Second HDMI settings changed; rebuilding the display layout", flush=True)
+                    mom_dual_failed = False
+                    if mom_hotplug is not None:
+                        mom_hotplug = MomHotplugRecovery()
+                    break
+                if (
+                    mom_hotplug is not None and not dual and
+                    raw_config.get("secondary_display_enabled") and
+                    mom_hotplug.ready(time.monotonic())
+                ):
+                    print("Both Mom HDMI inputs are ready; reloading the dual layout", flush=True)
                     mom_dual_failed = False
                     break
                 new_fingerprint = json.dumps(config, sort_keys=True)
