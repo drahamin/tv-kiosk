@@ -287,6 +287,19 @@ if ! cmp -s "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"; then
   install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" "$APP_DIR/systemd/tv-kiosk-remote.service" "$REMOTE_UNIT"
   REMOTE_CHANGED=true
 fi
+# Mom's kiosk.env is root-only. Pass just its non-secret role to the user
+# remote listener without changing other variants or display modes.
+case "${KIOSK_VARIANT:-auto}:$HARDWARE_MODEL" in
+  mom:*"Raspberry Pi 4"*|mom:*"Raspberry Pi 5"*)
+    REMOTE_DROPIN="$REMOTE_UNIT.d"
+    install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_USER" "$REMOTE_DROPIN"
+    if ! cmp -s "$APP_DIR/systemd/tv-kiosk-remote-mom.conf" "$REMOTE_DROPIN/50-mom-panel.conf"; then
+      install -m 0644 -o "$KIOSK_USER" -g "$KIOSK_USER" \
+        "$APP_DIR/systemd/tv-kiosk-remote-mom.conf" "$REMOTE_DROPIN/50-mom-panel.conf"
+      REMOTE_CHANGED=true
+    fi
+    ;;
+esac
 AUDIO_UNIT="/home/$KIOSK_USER/.config/systemd/user/tv-kiosk-audio.service"
 AUDIO_CHANGED=false
 if ! cmp -s "$APP_DIR/systemd/tv-kiosk-audio.service" "$AUDIO_UNIT"; then
