@@ -105,6 +105,10 @@ with no USB receiver or keyboard required. Enable Anynet+ on the TV, then use:
 - Fast-forward and Rewind to zoom in and out;
 - Stop to reset browser zoom to 100%.
 
+On the Mom kiosk, Menu or Info can toggle the Baiamonte controls panel and
+Back/Return can close it if the TV forwards those keys through Anynet+. These
+keys do not change other kiosk pages or the TV's selected input.
+
 Samsung keeps the Channel rocker for television functions and may show an
 unsupported-mode message when it is pressed on an HDMI input. The passive CEC
 listener does not announce itself as the active source, avoiding unwanted

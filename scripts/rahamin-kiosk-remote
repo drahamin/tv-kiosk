@@ -44,6 +44,14 @@ send_control_key() {
 
 cec_action() {
   case "$1" in
+    # LibCEC's canonical names are exit (0x0d), root menu (0x09), and
+    # display information (0x35). Match whole labels, not rewind/backward.
+    *"key pressed: exit ("*|*"key pressed: back ("*|*"key pressed: return ("*)
+      [ "$KIOSK_VARIANT" = mom ] && echo close_panel
+      ;;
+    *"key pressed: root menu ("*|*"key pressed: display information ("*)
+      [ "$KIOSK_VARIANT" = mom ] && echo toggle_panel
+      ;;
     *"key pressed: up"*) echo up ;;
     *"key pressed: down"*) echo down ;;
     *"key pressed: left"*) echo previous_page ;;
@@ -60,6 +68,11 @@ cec_action() {
 
 send_action() {
   case "$1" in
+    close_panel|toggle_panel)
+      [ "$KIOSK_VARIANT" = mom ] || return 0
+      timeout 3 python3 "${KIOSK_PANEL_HELPER:-/opt/tv-kiosk/scripts/mom-dashboard-panel.py}" \
+        "${1%_panel}" || true
+      ;;
     up|down) send_key "$1" ;;
     previous_page)
       if [ "$KIOSK_VARIANT" = baiamonte ]; then
