@@ -38,6 +38,9 @@ DRM_CONNECTORS = Path("/sys/class/drm")
 MOM_OUTPUTS = ("HDMI-A-1", "HDMI-A-2")
 MOM_HOTPLUG_PROBE_SECONDS = 5
 MOM_DUAL_RETRY_SECONDS = 60
+TRANSIENT_ERROR_CHECK_SECONDS = 10
+TRANSIENT_ERROR_RELOAD_SECONDS = 15
+TRANSIENT_ERROR_RESTART_COUNT = 4
 
 
 def stop(_signum, _frame):
@@ -307,6 +310,44 @@ def page_reports_offline(tab_id=None, port=DEBUG_PORT):
             "Runtime.evaluate",
             {
                 "expression": "Boolean(document.getElementById('offline') && !document.getElementById('offline').hidden)",
+                "returnByValue": True,
+            },
+        )
+        return bool(result.get("result", {}).get("value"))
+    except (OSError, URLError, ValueError, RuntimeError, KeyError):
+        return False
+
+
+def page_reports_transient_error(tab_id=None, port=DEBUG_PORT):
+    """Detect visible Cloudflare, proxy, and Chromium network error pages."""
+    try:
+        targets = [target for target in devtools("/json/list", port=port) if target.get("type") == "page"]
+        target = next((item for item in targets if item.get("id") == tab_id), targets[0] if targets else None)
+        if target is None:
+            return False
+        result = websocket_command(
+            target["webSocketDebuggerUrl"],
+            "Runtime.evaluate",
+            {
+                "expression": """(() => {
+                    const title = (document.title || '').toLowerCase();
+                    const body = ((document.body && document.body.innerText) || '').slice(0, 6000).toLowerCase();
+                    const cloudflareError = Boolean(document.querySelector(
+                        '#cf-error-details, .cf-error-details, #cf-wrapper .cf-error-code, [data-translate="error"]'
+                    ));
+                    return cloudflareError ||
+                        title.includes('bad gateway') ||
+                        title.includes('gateway time-out') ||
+                        title.includes('service unavailable') ||
+                        (body.includes('cloudflare') && (
+                            body.includes('ray id') || body.includes('host error') || body.includes('error code')
+                        )) ||
+                        body.includes('this site can’t be reached') ||
+                        body.includes("this site can't be reached") ||
+                        body.includes('err_connection_') ||
+                        body.includes('err_name_not_resolved') ||
+                        body.includes('err_timed_out');
+                })()""",
                 "returnByValue": True,
             },
         )
@@ -765,6 +806,11 @@ def supervise():
             next_page_health_check = 0
             last_offline_reload = float("-inf")
             next_secondary_retry = 0
+            next_transient_error_check = 0
+            last_primary_error_reload = float("-inf")
+            last_secondary_error_reload = float("-inf")
+            primary_transient_errors = 0
+            secondary_transient_errors = 0
             current_page_was_unreachable = False
             secondary_was_unreachable = secondary_waiting
             while running and process.poll() is None:
@@ -807,6 +853,8 @@ def supervise():
                     fingerprint = new_fingerprint
                     current = 0
                     next_rotation = float("inf") if len(config["pages"]) == 1 else time.monotonic() + config["rotation_seconds"]
+                    next_transient_error_check = time.monotonic() + TRANSIENT_ERROR_CHECK_SECONDS
+                    primary_transient_errors = 0
                     print("Loaded kiosk playlist:", ", ".join(page["name"] for page in config["pages"]), flush=True)
                 now = time.monotonic()
                 if len(config["pages"]) == 1 and now >= next_page_health_check:
@@ -830,11 +878,43 @@ def supervise():
                         print("Baiamonte second display connection restored; reloaded automatically", flush=True)
                     secondary_was_unreachable = not reachable
                     next_secondary_retry = now + (PAGE_RETRY_SECONDS if secondary_was_unreachable else PAGE_HEALTH_SECONDS)
+                if now >= next_transient_error_check:
+                    if page_reports_transient_error(tab_id):
+                        primary_transient_errors += 1
+                        if now - last_primary_error_reload >= TRANSIENT_ERROR_RELOAD_SECONDS:
+                            tab_id = show_page(config["pages"][current]["url"], tab_id, preserve_app_window=dual)
+                            last_primary_error_reload = now
+                            next_rotation = now + config["rotation_seconds"]
+                            print("Transient Cloudflare/network error on primary display; reloaded automatically", flush=True)
+                        if primary_transient_errors >= TRANSIENT_ERROR_RESTART_COUNT:
+                            print("Primary display error persisted after automatic reloads; rebuilding browser session", flush=True)
+                            break
+                    else:
+                        primary_transient_errors = 0
+                    if secondary_process is not None and page_reports_transient_error(secondary_tab_id, port=DEBUG_PORT + 1):
+                        secondary_transient_errors += 1
+                        if now - last_secondary_error_reload >= TRANSIENT_ERROR_RELOAD_SECONDS:
+                            secondary_tab_id = show_page(
+                                secondary_url,
+                                secondary_tab_id,
+                                port=DEBUG_PORT + 1,
+                                preserve_app_window=True,
+                            )
+                            last_secondary_error_reload = now
+                            print("Transient Cloudflare/network error on secondary display; reloaded automatically", flush=True)
+                        if secondary_transient_errors >= TRANSIENT_ERROR_RESTART_COUNT:
+                            print("Secondary display error persisted after automatic reloads; rebuilding browser session", flush=True)
+                            break
+                    else:
+                        secondary_transient_errors = 0
+                    next_transient_error_check = now + TRANSIENT_ERROR_CHECK_SECONDS
                 if requested_step and len(config["pages"]) > 1:
                     step = requested_step
                     requested_step = 0
                     current = (current + step) % len(config["pages"])
                     tab_id = show_page(config["pages"][current]["url"], tab_id, preserve_app_window=dual)
+                    primary_transient_errors = 0
+                    next_transient_error_check = time.monotonic() + TRANSIENT_ERROR_CHECK_SECONDS
                     print(f"Remote selected page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                 elif requested_step:
@@ -842,6 +922,8 @@ def supervise():
                 if time.monotonic() >= next_rotation:
                     current = (current + 1) % len(config["pages"])
                     tab_id = show_page(config["pages"][current]["url"], tab_id, preserve_app_window=dual)
+                    primary_transient_errors = 0
+                    next_transient_error_check = time.monotonic() + TRANSIENT_ERROR_CHECK_SECONDS
                     print(f"Showing page {current + 1}: {config['pages'][current]['name']}", flush=True)
                     next_rotation = time.monotonic() + config["rotation_seconds"]
                 # Chromium can reapply the desktop work-area geometry when a

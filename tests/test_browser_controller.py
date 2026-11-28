@@ -256,6 +256,24 @@ class BrowserControllerTests(unittest.TestCase):
         self.assertEqual(command.call_args.args[1], "Runtime.evaluate")
         self.assertIn("getElementById('offline')", command.call_args.args[2]["expression"])
 
+    def test_cloudflare_and_chromium_error_pages_are_detected_through_devtools(self):
+        target = {"id": "page-1", "type": "page", "webSocketDebuggerUrl": "ws://127.0.0.1:9222/devtools/page/page-1"}
+        with (
+            patch.object(controller, "devtools", return_value=[target]),
+            patch.object(controller, "websocket_command", return_value={"result": {"type": "boolean", "value": True}}) as command,
+        ):
+            self.assertTrue(controller.page_reports_transient_error("page-1"))
+        expression = command.call_args.args[2]["expression"]
+        self.assertIn("#cf-error-details", expression)
+        self.assertIn("this site can’t be reached", expression)
+        self.assertIn("err_connection_", expression)
+
+    def test_dual_display_controller_recovers_transient_cloudflare_errors(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("Transient Cloudflare/network error on primary display; reloaded automatically", source)
+        self.assertIn("Transient Cloudflare/network error on secondary display; reloaded automatically", source)
+        self.assertIn("TRANSIENT_ERROR_RESTART_COUNT", source)
+
     def test_controller_keeps_boot_screen_and_retries_single_page_sites(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("wait_for_page(raw_config[\"pages\"][0][\"url\"], process)", source)
